@@ -1,0 +1,2 @@
+# This file ensures the test/resources directory is tracked by git
+# Place test PDF files in test/resources/pdf/
