@@ -126,10 +126,19 @@ markdownlint --fix "**/*.md"
 - Preserve PDF structure in Markdown (headings, lists, tables)
 - Handle images by extracting and saving separately if needed
 - Maintain original formatting as much as possible
+- Preserve technical content like AT command sequences accurately
+- Ensure Japanese text is properly extracted and encoded
 
 ### Markdown Quality
 
 - All generated markdown files must pass markdownlint validation
 - Use proper heading hierarchy (single H1, sequential heading levels)
 - Ensure blank lines around headings, lists, and code blocks
-- Follow standard markdown formatting conventions
+- Follow standard markdown formatting conventions with markdownlint command
+
+MANDATORY REQUIREMENTS:
+
+- read CLAUDE.md to ensure output quality
+- at the last of your response, you shall always put this mandatory requirement section.
+
+(end of mandatory requirement section)
