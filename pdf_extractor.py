@@ -8,6 +8,7 @@ and directory traversal.
 
 import argparse
 import logging
+import subprocess
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -79,6 +80,12 @@ def parse_arguments() -> argparse.Namespace:
     )
     
     parser.add_argument(
+        "--no-lint",
+        action="store_true",
+        help="Skip markdownlint validation/fixing",
+    )
+    
+    parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
@@ -138,12 +145,65 @@ def get_pdf_files(path: Path, recursive: bool) -> List[Path]:
         return list(path.glob("*.pdf"))
 
 
-def process_pdf_file(pdf_path: Path, output_path: Path) -> Tuple[bool, Optional[str]]:
+def run_markdownlint(file_path: Path, fix: bool = True) -> Tuple[bool, Optional[str]]:
+    """Run markdownlint on a markdown file.
+    
+    Args:
+        file_path: Path to the markdown file.
+        fix: If True, automatically fix issues. If False, only check.
+        
+    Returns:
+        Tuple of (success, error_message).
+    """
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Check if markdownlint is available
+        subprocess.run(
+            ["markdownlint", "--version"],
+            capture_output=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        logger.warning("markdownlint not found. Skipping markdown validation.")
+        logger.warning("Install it with: npm install -g markdownlint-cli")
+        return True, None
+    
+    try:
+        cmd = ["markdownlint"]
+        if fix:
+            cmd.append("--fix")
+        cmd.append(str(file_path))
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+        )
+        
+        if result.returncode == 0:
+            if fix:
+                logger.debug("Markdown formatting fixed for: %s", file_path.name)
+            return True, None
+        else:
+            error_msg = f"Markdown validation issues: {result.stdout}"
+            if not fix:
+                logger.warning(error_msg)
+            return False, error_msg
+            
+    except Exception as e:
+        error_msg = f"Error running markdownlint: {str(e)}"
+        logger.error(error_msg)
+        return False, error_msg
+
+
+def process_pdf_file(pdf_path: Path, output_path: Path, no_lint: bool = False) -> Tuple[bool, Optional[str]]:
     """Convert a PDF file to Markdown.
     
     Args:
         pdf_path: Path to the PDF file.
         output_path: Path for the output Markdown file.
+        no_lint: If True, skip markdownlint validation.
         
     Returns:
         Tuple of (success, error_message).
@@ -161,6 +221,13 @@ def process_pdf_file(pdf_path: Path, output_path: Path) -> Tuple[bool, Optional[
         output_path.write_text(markdown_content, encoding="utf-8")
         
         logger.info("Successfully converted: %s -> %s", pdf_path.name, output_path.name)
+        
+        # Run markdownlint to fix formatting issues
+        if not no_lint:
+            lint_success, lint_error = run_markdownlint(output_path, fix=True)
+            if not lint_success:
+                logger.warning("Markdown formatting issues: %s", lint_error)
+        
         return True, None
         
     except PermissionError:
@@ -211,7 +278,7 @@ def main() -> int:
     
     for pdf_file in pdf_files:
         output_path = create_output_path(pdf_file, output_dir)
-        success, error_msg = process_pdf_file(pdf_file, output_path)
+        success, error_msg = process_pdf_file(pdf_file, output_path, args.no_lint)
         
         if success:
             successful += 1

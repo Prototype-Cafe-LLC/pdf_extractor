@@ -14,6 +14,7 @@ and structure.
 - 🖼️ Handles PDFs with images
 - ⚡ Fast and efficient conversion
 - 🛡️ Graceful error handling
+- ✨ Automatic markdown formatting with markdownlint
 
 ## Installation
 
@@ -21,6 +22,8 @@ and structure.
 
 - Python 3.12 or higher
 - [uv](https://github.com/astral-sh/uv) package manager
+- [markdownlint-cli](https://github.com/igorshubovych/markdownlint-cli)
+  (recommended for markdown validation)
 
 ### Setup
 
@@ -43,6 +46,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install -e .
+```
+
+1. Install markdownlint (recommended):
+
+```bash
+npm install -g markdownlint-cli
 ```
 
 ## Usage
@@ -93,6 +102,7 @@ python pdf_extractor.py document.pdf -v
 - **-o, --output**: Output directory (default: 'md' in current directory)
 - **-v, --verbose**: Enable verbose logging
 - **--recursive**: Process directories recursively
+- **--no-lint**: Skip markdownlint validation/fixing
 - **--version**: Show version information
 
 ## Development
@@ -158,6 +168,9 @@ The tool preserves:
 - Code blocks and technical content
 - Unicode text (including Japanese)
 
+Generated markdown files are automatically validated and fixed using markdownlint
+to ensure consistent formatting and compliance with markdown standards.
+
 ## Contributing
 
 1. Fork the repository
@@ -168,7 +181,8 @@ The tool preserves:
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE)
+file for details.
 
 ## Support
 

@@ -143,7 +143,7 @@ class TestProcessPdfFile:
         mock_to_markdown.return_value = "# Test Markdown\n\nContent"
         
         # Execute
-        success, error = process_pdf_file(pdf_file, output_file)
+        success, error = process_pdf_file(pdf_file, output_file, no_lint=True)
         
         # Verify
         assert success is True
@@ -162,7 +162,7 @@ class TestProcessPdfFile:
         mock_to_markdown.side_effect = Exception("Conversion failed")
         
         # Execute
-        success, error = process_pdf_file(pdf_file, output_file)
+        success, error = process_pdf_file(pdf_file, output_file, no_lint=True)
         
         # Verify
         assert success is False
@@ -180,7 +180,7 @@ class TestProcessPdfFile:
         mock_to_markdown.side_effect = PermissionError("Access denied")
         
         # Execute
-        success, error = process_pdf_file(pdf_file, output_file)
+        success, error = process_pdf_file(pdf_file, output_file, no_lint=True)
         
         # Verify
         assert success is False
@@ -248,7 +248,7 @@ class TestIntegration:
         pdf_file = pdf_files[0]
         output_file = tmp_path / f"{pdf_file.stem}.md"
         
-        success, error = process_pdf_file(pdf_file, output_file)
+        success, error = process_pdf_file(pdf_file, output_file, no_lint=True)
         
         assert success is True
         assert error is None
