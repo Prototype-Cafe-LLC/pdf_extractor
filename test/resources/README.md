@@ -4,7 +4,7 @@ This directory contains test resources for the PDF Extractor project.
 
 ## Directory Structure
 
-```
+```text
 test/resources/
 ├── pdf/          # Place test PDF files here
 └── expected/     # Expected markdown output files (optional)

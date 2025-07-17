@@ -139,6 +139,12 @@ markdownlint --fix "**/*.md"
 MANDATORY REQUIREMENTS:
 
 - read CLAUDE.md to ensure output quality
+- ALWAYS run `markdownlint <file>` before committing any markdown files
+- ALWAYS fix all markdownlint errors immediately when found
+- Common markdownlint fixes:
+  - Add language identifier to code blocks (use `text` for generic)
+  - Ensure files end with exactly one newline character
+  - Add blank lines around headings, lists, and code blocks
 - at the last of your response, you shall always put this mandatory requirement section.
 
 (end of mandatory requirement section)
