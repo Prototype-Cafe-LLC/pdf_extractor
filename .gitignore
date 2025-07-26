@@ -65,6 +65,11 @@ md/
 # Vector database files
 data/vector_db/
 
+# Test scripts (temporary)
+test_*.py
+debug_*.py
+verify_*.py
+
 # OS
 .DS_Store
 Thumbs.db
