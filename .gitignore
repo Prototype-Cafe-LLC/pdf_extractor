@@ -62,6 +62,13 @@ md/
 !CLAUDE.md
 !test/resources/README.md
 
+# Data and binary files
+data/
+*.bin
+*.db
+*.sqlite
+*.sqlite3
+
 # Vector database files
 data/vector_db/
 
