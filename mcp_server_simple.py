@@ -13,16 +13,24 @@ import yaml
 import importlib.metadata
 from typing import Any, Dict, List, Optional
 from pathlib import Path
+from functools import partial
 
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 from mcp.server.lowlevel.server import NotificationOptions
-from mcp.types import Tool, TextContent
+from mcp.types import Tool, TextContent, ProgressNotificationParams, ProgressNotification
 
 from rag_engine.retrieval import RAGEngine
 
 logger = logging.getLogger(__name__)
+
+# Constants for resource limits
+MAX_FILES_PER_BATCH = 100
+MAX_FILE_SIZE_MB = 50
+MAX_PATH_LENGTH = 255
+MAX_QUERY_LENGTH = 1000
+MAX_TOP_K = 20
 
 
 class SimplePDFRAGMCPServer:
@@ -70,11 +78,94 @@ class SimplePDFRAGMCPServer:
             
         Returns:
             Resolved absolute path as string
+            
+        Raises:
+            ValueError: If path attempts to escape allowed directories
         """
         path_obj = Path(path)
+        
+        # Resolve to absolute path, following symlinks
         if not path_obj.is_absolute():
-            return str(self._script_dir / path_obj)
-        return str(path_obj)
+            resolved_path = (self._script_dir / path_obj).resolve()
+        else:
+            resolved_path = path_obj.resolve()
+        
+        # Security check: ensure path is within allowed directories
+        allowed_dirs = [
+            self._script_dir,
+            Path.home(),  # User's home directory
+            Path("/tmp"),  # Temporary directory
+        ]
+        
+        # Check if resolved path is within any allowed directory
+        is_allowed = any(
+            self._is_path_under_directory(resolved_path, allowed_dir)
+            for allowed_dir in allowed_dirs
+        )
+        
+        if not is_allowed:
+            raise ValueError(f"Access denied: Path '{path}' is outside allowed directories")
+        
+        return str(resolved_path)
+    
+    def _is_path_under_directory(self, path: Path, directory: Path) -> bool:
+        """Check if a path is under a given directory.
+        
+        Args:
+            path: Path to check
+            directory: Directory to check against
+            
+        Returns:
+            True if path is under directory, False otherwise
+        """
+        try:
+            path.resolve().relative_to(directory.resolve())
+            return True
+        except ValueError:
+            return False
+    
+    def _get_progress_context(self) -> tuple[Optional[str], Optional[Any]]:
+        """Extract progress token and context from request.
+        
+        Returns:
+            Tuple of (progress_token, context)
+        """
+        try:
+            context = self.server.request_context
+            if context and hasattr(context, 'meta'):
+                meta = getattr(context, 'meta', None)
+                if meta and hasattr(meta, 'progressToken'):
+                    progress_token = getattr(meta, 'progressToken', None)
+                    if isinstance(progress_token, str):
+                        return progress_token, context
+            return None, None
+        except Exception as e:
+            logger.debug(f"No progress context available: {e}")
+            return None, None
+    
+    async def _send_progress(self, progress: float, message: str, 
+                           progress_token: Optional[str] = None, 
+                           context: Optional[Any] = None) -> None:
+        """Send progress notification if token available.
+        
+        Args:
+            progress: Progress value (0.0 to 1.0)
+            message: Progress message
+            progress_token: Optional progress token
+            context: Optional request context
+        """
+        if not progress_token or not context:
+            return
+            
+        try:
+            await context.session.send_progress_notification(
+                progress_token=progress_token,
+                progress=min(1.0, max(0.0, progress)),  # Clamp to 0-1
+                total=1.0,
+                message=message[:200]  # Limit message length
+            )
+        except Exception as e:
+            logger.debug(f"Failed to send progress: {e}")
     
     def setup_handlers(self):
         """Setup MCP server handlers."""
@@ -84,8 +175,8 @@ class SimplePDFRAGMCPServer:
             """List available tools."""
             return [
                 Tool(
-                    name="query_technical_docs",
-                    description="Query technical documentation using RAG",
+                    name="pdfrag.query_technical_docs",
+                    description="Query the PDF RAG knowledge base for technical documentation answers",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -103,8 +194,8 @@ class SimplePDFRAGMCPServer:
                     }
                 ),
                 Tool(
-                    name="add_pdf_document",
-                    description="Add a PDF document to the knowledge base",
+                    name="pdfrag.add_pdf_document",
+                    description="Add a single PDF document to the PDF RAG knowledge base",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -122,19 +213,57 @@ class SimplePDFRAGMCPServer:
                     }
                 ),
                 Tool(
-                    name="list_documents",
-                    description="List all documents in the knowledge base",
+                    name="pdfrag.add_pdf_documents",
+                    description="Add multiple PDF documents from a folder to the PDF RAG knowledge base",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "folder_path": {
+                                "type": "string",
+                                "description": "Path to folder containing PDF files"
+                            },
+                            "document_type": {
+                                "type": "string",
+                                "description": "Default type for all documents (e.g., 'at_commands', 'hardware_design')",
+                                "default": "unknown"
+                            },
+                            "recursive": {
+                                "type": "boolean",
+                                "description": "Whether to search for PDFs recursively in subfolders",
+                                "default": False
+                            }
+                        },
+                        "required": ["folder_path"]
+                    }
+                ),
+                Tool(
+                    name="pdfrag.list_documents",
+                    description="List all PDF documents currently stored in the PDF RAG knowledge base",
                     inputSchema={
                         "type": "object",
                         "properties": {}
                     }
                 ),
                 Tool(
-                    name="get_system_info",
-                    description="Get system information and component status",
+                    name="pdfrag.get_system_info",
+                    description="Get PDF RAG system information, configuration, and component status",
                     inputSchema={
                         "type": "object",
                         "properties": {}
+                    }
+                ),
+                Tool(
+                    name="pdfrag.clear_database",
+                    description="Clear the PDF RAG vector database (removes embeddings/chunks only, original PDFs remain untouched)",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "confirm": {
+                                "type": "boolean",
+                                "description": "Must be true to confirm database clearing"
+                            }
+                        },
+                        "required": ["confirm"]
                     }
                 )
             ]
@@ -143,14 +272,18 @@ class SimplePDFRAGMCPServer:
         async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             """Handle tool calls."""
             try:
-                if name == "query_technical_docs":
+                if name == "pdfrag.query_technical_docs":
                     return await self._handle_query(arguments)
-                elif name == "add_pdf_document":
+                elif name == "pdfrag.add_pdf_document":
                     return await self._handle_add_document(arguments)
-                elif name == "list_documents":
+                elif name == "pdfrag.add_pdf_documents":
+                    return await self._handle_add_documents(arguments)
+                elif name == "pdfrag.list_documents":
                     return await self._handle_list_documents()
-                elif name == "get_system_info":
+                elif name == "pdfrag.get_system_info":
                     return await self._handle_get_system_info()
+                elif name == "pdfrag.clear_database":
+                    return await self._handle_clear_database(arguments)
                 else:
                     return [TextContent(type="text", text=f"Unknown tool: {name}")]
             except Exception as e:
@@ -258,21 +391,36 @@ class SimplePDFRAGMCPServer:
         question = arguments.get("question", "")
         top_k = arguments.get("top_k", 5)
         
+        # Input validation
         if not question:
             return [TextContent(type="text", text="Error: No question provided")]
+        
+        if len(question) > MAX_QUERY_LENGTH:
+            return [TextContent(type="text", text=f"Error: Question too long (max {MAX_QUERY_LENGTH} characters)")]
+        
+        # Validate top_k
+        if not isinstance(top_k, int) or top_k < 1:
+            top_k = 5
+        elif top_k > MAX_TOP_K:
+            top_k = MAX_TOP_K
         
         # Initialize RAG engine if needed
         try:
             await self._initialize_rag_engine()
         except Exception as e:
-            return [TextContent(type="text", text=f"Error: Failed to initialize RAG engine - {str(e)}")]
+            logger.error(f"RAG initialization failed: {e}")
+            return [TextContent(type="text", text="Error: Failed to initialize search engine")]
         
         if not self.rag_engine:
-            return [TextContent(type="text", text="Error: RAG engine not available")]
+            return [TextContent(type="text", text="Error: Search engine not available")]
         
-        # Get RAG response
+        # Get RAG response asynchronously
         try:
-            response = self.rag_engine.query(question, top_k)
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                partial(self.rag_engine.query, question, top_k)
+            )
             
             # Format response with sources
             answer = response.answer
@@ -306,46 +454,227 @@ class SimplePDFRAGMCPServer:
             
         except Exception as e:
             logger.error(f"Query failed: {e}")
-            return [TextContent(type="text", text=f"Error: Query failed - {str(e)}")]
+            return [TextContent(type="text", text="Error: Failed to process query. Please try again.")]
     
     async def _handle_add_document(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle adding new PDF documents."""
         pdf_path = arguments.get("pdf_path", "")
         document_type = arguments.get("document_type", "unknown")
         
+        # Input validation
         if not pdf_path:
             return [TextContent(type="text", text="Error: No PDF path provided")]
         
-        # Resolve the path
-        pdf_path = Path(self._resolve_path(pdf_path))
+        if len(str(pdf_path)) > MAX_PATH_LENGTH:
+            return [TextContent(type="text", text="Error: Path too long")]
+        
+        # Sanitize document type
+        document_type = str(document_type)[:50].replace('\n', ' ').strip()
+        
+        # Resolve the path with security check
+        try:
+            pdf_path = Path(self._resolve_path(pdf_path))
+        except ValueError as e:
+            logger.warning(f"Path access denied: {pdf_path}")
+            return [TextContent(type="text", text="Error: Access denied to specified path")]
         
         if not pdf_path.exists():
-            return [TextContent(type="text", text=f"Error: PDF file not found: {pdf_path}")]
+            return [TextContent(type="text", text="Error: PDF file not found")]
         
         if not pdf_path.suffix.lower() == '.pdf':
-            return [TextContent(type="text", text=f"Error: Not a PDF file: {pdf_path}")]
+            return [TextContent(type="text", text="Error: Not a PDF file")]
+        
+        # Check file size
+        file_size_mb = pdf_path.stat().st_size / (1024 * 1024)
+        if file_size_mb > MAX_FILE_SIZE_MB:
+            return [TextContent(type="text", text=f"Error: File too large (max {MAX_FILE_SIZE_MB}MB)")]
         
         # Initialize RAG engine if needed
         try:
             await self._initialize_rag_engine()
         except Exception as e:
-            return [TextContent(type="text", text=f"Error: Failed to initialize RAG engine - {str(e)}")]
+            logger.error(f"RAG initialization failed: {e}")
+            return [TextContent(type="text", text="Error: Failed to initialize search engine")]
         
         if not self.rag_engine:
-            return [TextContent(type="text", text="Error: RAG engine not available")]
+            return [TextContent(type="text", text="Error: Search engine not available")]
+        
+        # Get progress context
+        progress_token, context = self._get_progress_context()
+        
+        # Send initial progress notification
+        await self._send_progress(0.1, f"Starting to process {pdf_path.name}", progress_token, context)
         
         # Add document to knowledge base
         try:
-            success = self.rag_engine.add_pdf_document(pdf_path, document_type)
+            # Send progress update
+            await self._send_progress(0.5, f"Converting and processing {pdf_path.name}", progress_token, context)
+            
+            # Run blocking operation in executor
+            loop = asyncio.get_event_loop()
+            success = await loop.run_in_executor(
+                None,
+                self.rag_engine.add_pdf_document,
+                pdf_path,
+                document_type
+            )
+            
+            # Send final progress notification
+            await self._send_progress(1.0, f"Completed processing {pdf_path.name}", progress_token, context)
             
             if success:
                 return [TextContent(type="text", text=f"Successfully added document: {pdf_path.name}")]
             else:
+                # Send error notification
+                await self._send_progress(1.0, f"❌ Failed to add document: {pdf_path.name}", progress_token, context)
                 return [TextContent(type="text", text=f"Failed to add document: {pdf_path.name}")]
                 
         except Exception as e:
             logger.error(f"Failed to add document: {e}")
-            return [TextContent(type="text", text=f"Error: Failed to add document - {str(e)}")]
+            
+            # Send error notification
+            await self._send_progress(1.0, f"❌ Error processing document", progress_token, context)
+            
+            return [TextContent(type="text", text="Error: Failed to add document")]
+    
+    async def _handle_add_documents(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle adding multiple PDF documents from a folder."""
+        folder_path = arguments.get("folder_path", "")
+        document_type = arguments.get("document_type", "unknown")
+        recursive = arguments.get("recursive", False)
+        
+        # Input validation
+        if not folder_path:
+            return [TextContent(type="text", text="Error: No folder path provided")]
+        
+        if len(str(folder_path)) > MAX_PATH_LENGTH:
+            return [TextContent(type="text", text="Error: Path too long")]
+        
+        # Sanitize document type
+        document_type = str(document_type)[:50].replace('\n', ' ').strip()
+        
+        # Resolve the path with security check
+        try:
+            folder_path = Path(self._resolve_path(folder_path))
+        except ValueError as e:
+            logger.warning(f"Path access denied: {folder_path}")
+            return [TextContent(type="text", text="Error: Access denied to specified path")]
+        
+        if not folder_path.exists():
+            return [TextContent(type="text", text="Error: Folder not found")]
+        
+        if not folder_path.is_dir():
+            return [TextContent(type="text", text="Error: Not a directory")]
+        
+        # Find all PDF files
+        if recursive:
+            pdf_files = list(folder_path.rglob("*.pdf"))
+        else:
+            pdf_files = list(folder_path.glob("*.pdf"))
+        
+        if not pdf_files:
+            return [TextContent(type="text", text="No PDF files found")]
+        
+        # Check file count limit
+        if len(pdf_files) > MAX_FILES_PER_BATCH:
+            return [TextContent(type="text", text=f"Error: Too many files (max {MAX_FILES_PER_BATCH})")]
+        
+        # Initialize RAG engine if needed
+        try:
+            await self._initialize_rag_engine()
+        except Exception as e:
+            logger.error(f"RAG initialization failed: {e}")
+            return [TextContent(type="text", text="Error: Failed to initialize search engine")]
+        
+        if not self.rag_engine:
+            return [TextContent(type="text", text="Error: Search engine not available")]
+        
+        # Get progress context
+        progress_token, context = self._get_progress_context()
+        
+        # Process each PDF file
+        results = []
+        success_count = 0
+        failed_files = []
+        
+        response = f"Processing {len(pdf_files)} PDF files...\n\n"
+        
+        for i, pdf_file in enumerate(pdf_files, 1):
+            try:
+                # Check file size
+                file_size_mb = pdf_file.stat().st_size / (1024 * 1024)
+                if file_size_mb > MAX_FILE_SIZE_MB:
+                    failed_files.append(pdf_file.name)
+                    results.append(f"❌ {pdf_file.name} - File too large")
+                    continue
+                
+                # Send progress notification
+                progress = i / len(pdf_files)
+                message = f"Processing {pdf_file.name} ({i}/{len(pdf_files)})"
+                await self._send_progress(progress, message, progress_token, context)
+                
+                # Log progress
+                logger.info(f"Processing file {i}/{len(pdf_files)}: {pdf_file.name}")
+                
+                # Add document to knowledge base using executor
+                loop = asyncio.get_event_loop()
+                success = await loop.run_in_executor(
+                    None,
+                    self.rag_engine.add_pdf_document,
+                    pdf_file,
+                    document_type
+                )
+                
+                if success:
+                    success_count += 1
+                    results.append(f"✅ {pdf_file.name}")
+                else:
+                    failed_files.append(pdf_file.name)
+                    results.append(f"❌ {pdf_file.name} - Failed to process")
+                    
+                    # Send error notification
+                    await self._send_progress(
+                        progress, 
+                        f"❌ Failed to process {pdf_file.name}", 
+                        progress_token, 
+                        context
+                    )
+                    
+            except Exception as e:
+                logger.error(f"Failed to add document {pdf_file.name}: {e}")
+                failed_files.append(pdf_file.name)
+                results.append(f"❌ {pdf_file.name} - Processing error")
+                
+                # Send error notification
+                await self._send_progress(
+                    i / len(pdf_files), 
+                    f"❌ Error processing {pdf_file.name}", 
+                    progress_token, 
+                    context
+                )
+        
+        # Send final progress notification
+        await self._send_progress(
+            1.0, 
+            f"Completed processing {len(pdf_files)} files", 
+            progress_token, 
+            context
+        )
+        
+        # Create summary
+        response += "## Results\n\n"
+        response += "\n".join(results)
+        response += f"\n\n## Summary\n"
+        response += f"- Total files: {len(pdf_files)}\n"
+        response += f"- Successfully added: {success_count}\n"
+        response += f"- Failed: {len(failed_files)}\n"
+        
+        if failed_files:
+            response += f"\n## Failed Files\n"
+            for file in failed_files:
+                response += f"- {file}\n"
+        
+        return [TextContent(type="text", text=response)]
     
     async def _handle_list_documents(self) -> List[TextContent]:
         """Handle listing documents in knowledge base."""
@@ -353,13 +682,19 @@ class SimplePDFRAGMCPServer:
         try:
             await self._initialize_rag_engine()
         except Exception as e:
-            return [TextContent(type="text", text=f"Error: Failed to initialize RAG engine - {str(e)}")]
+            logger.error(f"RAG initialization failed: {e}")
+            return [TextContent(type="text", text="Error: Failed to initialize search engine")]
         
         if not self.rag_engine:
-            return [TextContent(type="text", text="Error: RAG engine not available")]
+            return [TextContent(type="text", text="Error: Search engine not available")]
         
         try:
-            documents = self.rag_engine.list_documents()
+            # Run blocking operation in executor
+            loop = asyncio.get_event_loop()
+            documents = await loop.run_in_executor(
+                None,
+                self.rag_engine.list_documents
+            )
             
             # Add debug logging
             logger.info(f"Found {len(documents)} documents in knowledge base")
@@ -377,7 +712,84 @@ class SimplePDFRAGMCPServer:
             
         except Exception as e:
             logger.error(f"Failed to list documents: {e}")
-            return [TextContent(type="text", text=f"Error: Failed to list documents - {str(e)}")]
+            return [TextContent(type="text", text="Error: Failed to list documents")]
+
+
+    async def _handle_clear_database(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle clearing the database."""
+        confirm = arguments.get("confirm", False)
+        
+        if not confirm:
+            return [TextContent(type="text", text="Error: You must set confirm=true to clear the database")]
+        
+        # Initialize RAG engine if needed
+        try:
+            await self._initialize_rag_engine()
+        except Exception as e:
+            logger.error(f"RAG initialization failed: {e}")
+            return [TextContent(type="text", text="Error: Failed to initialize search engine")]
+        
+        if not self.rag_engine:
+            return [TextContent(type="text", text="Error: Search engine not available")]
+        
+        # Get progress context
+        progress_token, context = self._get_progress_context()
+        
+        try:
+            # Get current document count using executor
+            loop = asyncio.get_event_loop()
+            documents = await loop.run_in_executor(
+                None,
+                self.rag_engine.list_documents
+            )
+            doc_count = len(documents)
+            total_chunks = sum(doc['chunk_count'] for doc in documents)
+            
+            if doc_count == 0:
+                return [TextContent(type="text", text="Database is already empty")]
+            
+            # Send initial progress notification
+            await self._send_progress(
+                0.1, 
+                f"Clearing {doc_count} documents ({total_chunks} chunks)...", 
+                progress_token, 
+                context
+            )
+            
+            # Clear the database
+            logger.info(f"Clearing database with {doc_count} documents and {total_chunks} chunks")
+            
+            # Clear the vector store collection using executor
+            success = await loop.run_in_executor(
+                None,
+                self.rag_engine.vector_store.clear_collection
+            )
+            
+            # Send final progress notification
+            await self._send_progress(
+                1.0, 
+                "Database cleared successfully", 
+                progress_token, 
+                context
+            )
+            
+            if success:
+                return [TextContent(type="text", text=f"Successfully cleared database. Removed {doc_count} documents ({total_chunks} chunks).")]
+            else:
+                return [TextContent(type="text", text="Failed to clear database")]
+            
+        except Exception as e:
+            logger.error(f"Failed to clear database: {e}")
+            
+            # Send error notification
+            await self._send_progress(
+                1.0, 
+                "❌ Error clearing database", 
+                progress_token, 
+                context
+            )
+            
+            return [TextContent(type="text", text="Error: Failed to clear database")]
 
 
 async def main():

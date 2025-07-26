@@ -187,8 +187,11 @@ class VectorStore:
             List of document metadata
         """
         try:
-            # Get all documents
-            results = self.collection.get()
+            # Get count first
+            count = self.collection.count()
+            
+            # Get all documents with explicit limit
+            results = self.collection.get(limit=count if count > 0 else 1000)
             
             # Extract unique documents
             documents = {}
@@ -203,11 +206,37 @@ class VectorStore:
                     }
                 documents[doc_name]['chunk_count'] += 1
             
+            logger.info(f"Found {len(documents)} unique documents from {count} total chunks")
+            
             return list(documents.values())
             
         except Exception as e:
             logger.error(f"Failed to list documents: {e}")
             return []
+    
+    def clear_collection(self) -> bool:
+        """Clear all documents from the collection.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get all document IDs
+            results = self.collection.get()
+            all_ids = results['ids']
+            
+            if all_ids:
+                # Delete all documents
+                self.collection.delete(ids=all_ids)
+                logger.info(f"Cleared {len(all_ids)} chunks from collection")
+            else:
+                logger.info("Collection was already empty")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to clear collection: {e}")
+            return False
     
     def delete_document(self, document_name: str) -> bool:
         """Delete all chunks for a specific document.
