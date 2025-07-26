@@ -219,8 +219,12 @@ class DocumentChunker:
         # Find AT commands in content
         at_commands_found = re.findall(self.at_command_pattern, content)
         
+        # Create the full chunk ID with document name
+        full_chunk_id = f"{metadata.get('document', 'unknown')}_{chunk_id}"
+        
         chunk_metadata.update({
-            'chunk_id': chunk_id,
+            'chunk_id': full_chunk_id,  # Store the FULL chunk ID with document name
+            'chunk_index': chunk_id,     # Store the numeric index separately
             'start_char': start_char,
             'end_char': end_char,
             'token_count': len(self.tokenizer.encode(content)),
@@ -234,7 +238,7 @@ class DocumentChunker:
         return DocumentChunk(
             content=content,
             metadata=chunk_metadata,
-            chunk_id=f"{metadata.get('document', 'unknown')}_{chunk_id}",
+            chunk_id=full_chunk_id,
             start_char=start_char,
             end_char=end_char
         )

@@ -87,15 +87,20 @@ class VectorStore:
             else:
                 embedding_list = embeddings
             
-            # Generate stable, unique IDs for chunks
+            # Use the chunk_id from metadata which already includes document name
             chunk_ids = []
-            for i, (chunk, meta) in enumerate(zip(chunks, metadata)):
-                chunk_id = self._generate_chunk_id(
-                    document_path=meta.get('source', meta.get('document', 'unknown')),
-                    chunk_index=meta.get('chunk_id', i),
-                    chunk_content=chunk[:100]  # Use first 100 chars for stability
-                )
-                chunk_ids.append(chunk_id)
+            for i, meta in enumerate(metadata):
+                if 'chunk_id' in meta and isinstance(meta['chunk_id'], str):
+                    # Use the pre-generated chunk_id which includes document name
+                    chunk_ids.append(meta['chunk_id'])
+                else:
+                    # Fallback: generate a unique ID
+                    chunk_id = self._generate_chunk_id(
+                        document_path=meta.get('source', meta.get('document', 'unknown')),
+                        chunk_index=i,
+                        chunk_content=chunks[i][:100]
+                    )
+                    chunk_ids.append(chunk_id)
             
             # Store in ChromaDB
             self.collection.add(
