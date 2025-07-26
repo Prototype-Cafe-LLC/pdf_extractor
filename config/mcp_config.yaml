@@ -1,0 +1,38 @@
+# MCP Server Configuration for PDF RAG
+
+# Server Information
+server:
+  name: "pdf-rag-mcp"
+  version: "1.0.0"
+  description: "RAG-powered technical documentation assistant"
+  author: "PDF Extractor Team"
+
+# Tools Configuration
+tools:
+  query_technical_docs:
+    name: "query_technical_docs"
+    description: "Query technical documentation using RAG"
+    enabled: true
+    
+  add_pdf_document:
+    name: "add_pdf_document"
+    description: "Add a PDF document to the knowledge base"
+    enabled: true
+    
+  list_documents:
+    name: "list_documents"
+    description: "List all documents in the knowledge base"
+    enabled: true
+    
+  get_system_info:
+    name: "get_system_info"
+    description: "Get system information and status"
+    enabled: true
+
+# RAG Configuration Reference
+rag_config_path: "./config/rag_config.yaml"
+
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s" 
