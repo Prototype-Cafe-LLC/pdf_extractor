@@ -52,12 +52,18 @@ dmypy.json
 *.swo
 *~
 
+# Claude settings
+.claude/settings.local.json
+
 # Project specific
 md/
 *.md
 !README.md
 !CLAUDE.md
 !test/resources/README.md
+
+# Vector database files
+data/vector_db/
 
 # OS
 .DS_Store

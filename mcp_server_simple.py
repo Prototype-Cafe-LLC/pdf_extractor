@@ -8,6 +8,7 @@ RAG-powered technical documentation queries through standardized tools.
 import asyncio
 import json
 import logging
+import os
 import yaml
 import importlib.metadata
 from typing import Any, Dict, List, Optional
@@ -17,12 +18,7 @@ from mcp.server import Server
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 from mcp.server.lowlevel.server import NotificationOptions
-from mcp.types import (
-    Tool,
-    TextContent,
-    CallToolRequest,
-    CallToolResult
-)
+from mcp.types import Tool, TextContent
 
 from rag_engine.retrieval import RAGEngine
 
@@ -35,6 +31,7 @@ class SimplePDFRAGMCPServer:
     def __init__(self):
         """Initialize the MCP server."""
         self.server = Server("pdf-rag-mcp")
+        self._script_dir = Path(__file__).parent.absolute()
         self.config = self._load_config()
         self.rag_engine = None
         self.setup_handlers()
@@ -44,26 +41,40 @@ class SimplePDFRAGMCPServer:
         config = {}
         
         # Load RAG config
-        rag_config_path = Path("config/rag_config.yaml")
+        rag_config_path = self._script_dir / "config" / "rag_config.yaml"
         if rag_config_path.exists():
             try:
                 with open(rag_config_path, 'r') as f:
                     config.update(yaml.safe_load(f))
-                logger.info("Loaded RAG configuration")
+                logger.info(f"Loaded RAG configuration from {rag_config_path}")
             except Exception as e:
                 logger.error(f"Failed to load RAG config: {e}")
         
         # Load MCP config
-        mcp_config_path = Path("config/mcp_config.yaml")
+        mcp_config_path = self._script_dir / "config" / "mcp_config.yaml"
         if mcp_config_path.exists():
             try:
                 with open(mcp_config_path, 'r') as f:
                     config.update(yaml.safe_load(f))
-                logger.info("Loaded MCP configuration")
+                logger.info(f"Loaded MCP configuration from {mcp_config_path}")
             except Exception as e:
                 logger.error(f"Failed to load MCP config: {e}")
         
         return config
+    
+    def _resolve_path(self, path: str) -> str:
+        """Resolve a path relative to script directory if it's relative.
+        
+        Args:
+            path: Path to resolve (can be relative or absolute)
+            
+        Returns:
+            Resolved absolute path as string
+        """
+        path_obj = Path(path)
+        if not path_obj.is_absolute():
+            return str(self._script_dir / path_obj)
+        return str(path_obj)
     
     def setup_handlers(self):
         """Setup MCP server handlers."""
@@ -214,16 +225,25 @@ class SimplePDFRAGMCPServer:
         try:
             logger.info("Initializing RAG engine...")
             
+            # Get vector_db_path from config and resolve it
+            vector_db_path = self.config.get("vector_store", {}).get("path", "./data/vector_db")
+            vector_db_path = self._resolve_path(vector_db_path)
+            
             # Prepare configuration
             rag_config = {
                 "llm_type": self.config.get("llm", {}).get("type", "openai"),
                 "llm_model": self.config.get("llm", {}).get("model", "gpt-4"),
                 "embedding_model": self.config.get("embedding", {}).get("model", "sentence-transformers/all-MiniLM-L6-v2"),
-                "vector_db_path": self.config.get("vector_store", {}).get("path", "./data/vector_db"),
+                "vector_db_path": vector_db_path,
                 "collection_name": self.config.get("vector_store", {}).get("collection_name", "technical_docs"),
                 "chunk_size": self.config.get("chunking", {}).get("max_tokens", 512),
                 "chunk_overlap": self.config.get("chunking", {}).get("overlap_tokens", 50),
             }
+            
+            # Log the actual path being used
+            logger.info(f"Script directory: {self._script_dir}")
+            logger.info(f"Vector DB path: {rag_config['vector_db_path']}")
+            logger.info(f"Current working directory: {os.getcwd()}")
             
             self.rag_engine = RAGEngine(rag_config)
             logger.info("RAG engine initialized successfully")
@@ -296,7 +316,9 @@ class SimplePDFRAGMCPServer:
         if not pdf_path:
             return [TextContent(type="text", text="Error: No PDF path provided")]
         
-        pdf_path = Path(pdf_path)
+        # Resolve the path
+        pdf_path = Path(self._resolve_path(pdf_path))
+        
         if not pdf_path.exists():
             return [TextContent(type="text", text=f"Error: PDF file not found: {pdf_path}")]
         
@@ -338,6 +360,9 @@ class SimplePDFRAGMCPServer:
         
         try:
             documents = self.rag_engine.list_documents()
+            
+            # Add debug logging
+            logger.info(f"Found {len(documents)} documents in knowledge base")
             
             if not documents:
                 return [TextContent(type="text", text="No documents in knowledge base")]
