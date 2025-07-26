@@ -10,8 +10,14 @@ from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 import logging
 from pathlib import Path
+import hashlib
+import re
+import unicodedata
 
 logger = logging.getLogger(__name__)
+
+# Constants
+CHROMADB_BATCH_LIMIT = 1000  # ChromaDB's documented limit for get/delete operations
 
 
 class VectorStore:
@@ -81,9 +87,15 @@ class VectorStore:
             else:
                 embedding_list = embeddings
             
-            # Generate IDs for chunks
-            chunk_ids = [f"chunk_{i}_{metadata[i].get('chunk_id', i)}" 
-                        for i in range(len(chunks))]
+            # Generate stable, unique IDs for chunks
+            chunk_ids = []
+            for i, (chunk, meta) in enumerate(zip(chunks, metadata)):
+                chunk_id = self._generate_chunk_id(
+                    document_path=meta.get('source', meta.get('document', 'unknown')),
+                    chunk_index=meta.get('chunk_id', i),
+                    chunk_content=chunk[:100]  # Use first 100 chars for stability
+                )
+                chunk_ids.append(chunk_id)
             
             # Store in ChromaDB
             self.collection.add(
@@ -180,7 +192,7 @@ class VectorStore:
             logger.error(f"Failed to get collection info: {e}")
             return {"error": str(e)}
     
-    def list_documents(self, batch_size: int = 1000) -> List[Dict[str, Any]]:
+    def list_documents(self, batch_size: int = CHROMADB_BATCH_LIMIT) -> List[Dict[str, Any]]:
         """List all unique documents in the collection.
         
         ChromaDB has a limit of 1000 items per get() call, so we need to paginate
@@ -193,34 +205,28 @@ class VectorStore:
             List of document metadata
         """
         try:
-            # Get total count
-            total_chunks = self.collection.count()
-            logger.debug(f"Total chunks in collection: {total_chunks}")
-            
-            # If no chunks, return empty
-            if total_chunks == 0:
-                logger.info("No documents in collection")
-                return []
+            # Limit batch_size to ChromaDB's maximum
+            batch_size = min(batch_size, CHROMADB_BATCH_LIMIT)
             
             # Collect all unique documents by paginating through chunks
             documents = {}
             retrieved_count = 0
-            
-            # ChromaDB doesn't support offset, so we need to use IDs for pagination
-            # First, get all IDs
-            all_ids = []
             offset = 0
             
-            while offset < total_chunks:
+            while True:
                 # Get a batch of results
-                batch_limit = min(batch_size, total_chunks - offset)
                 results = self.collection.get(
-                    limit=batch_limit,
+                    limit=batch_size,
                     offset=offset
                 )
                 
+                # Check if we got any results
+                batch_ids = results.get('ids', [])
+                if not batch_ids:
+                    break
+                
                 # Process this batch
-                batch_size_actual = len(results.get('ids', []))
+                batch_size_actual = len(batch_ids)
                 retrieved_count += batch_size_actual
                 
                 logger.debug(f"Retrieved batch at offset {offset}: {batch_size_actual} chunks")
@@ -238,14 +244,13 @@ class VectorStore:
                     documents[doc_name]['chunk_count'] += 1
                 
                 # If we got fewer results than requested, we've reached the end
-                if batch_size_actual < batch_limit:
-                    logger.debug(f"Reached end of collection at offset {offset + batch_size_actual}")
+                if batch_size_actual < batch_size:
                     break
                 
                 # Move to next batch
                 offset += batch_size_actual
             
-            logger.info(f"Found {len(documents)} unique documents from {retrieved_count} chunks (total: {total_chunks})")
+            logger.info(f"Found {len(documents)} unique documents from {retrieved_count} chunks")
             
             # Log document names for debugging if not too many
             if len(documents) <= 10:
@@ -259,27 +264,21 @@ class VectorStore:
             return []
     
     def clear_collection(self) -> bool:
-        """Clear all documents from the collection.
+        """Clear all documents from the collection atomically.
+        
+        Uses reset_collection for atomic operation to avoid race conditions.
         
         Returns:
             True if successful, False otherwise
         """
         try:
-            # Get all document IDs
-            results = self.collection.get()
-            all_ids = results['ids']
-            
-            if all_ids:
-                # Delete all documents
-                self.collection.delete(ids=all_ids)
-                logger.info(f"Cleared {len(all_ids)} chunks from collection")
-            else:
-                logger.info("Collection was already empty")
-            
-            return True
-            
-        except Exception as e:
+            # Use the atomic reset_collection method
+            return self.reset_collection()
+        except chromadb.errors.ChromaError as e:
             logger.error(f"Failed to clear collection: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error clearing collection: {e}")
             return False
     
     def delete_document(self, document_name: str) -> bool:
@@ -327,4 +326,43 @@ class VectorStore:
             
         except Exception as e:
             logger.error(f"Failed to reset collection: {e}")
-            return False 
+            return False
+    
+    def _generate_chunk_id(self, document_path: str, chunk_index: int, chunk_content: str) -> str:
+        """Generate a stable, unique ID for a chunk.
+        
+        Args:
+            document_path: Full path or unique identifier of the document
+            chunk_index: Index of the chunk within the document
+            chunk_content: The actual text content of the chunk (first 100 chars)
+            
+        Returns:
+            A unique, stable ID for the chunk
+        """
+        # Create a deterministic ID based on document + position + content
+        id_string = f"{document_path}|{chunk_index}|{chunk_content}"
+        hash_value = hashlib.sha256(id_string.encode('utf-8')).hexdigest()
+        
+        # Use document name slug + hash for readability and uniqueness
+        doc_slug = self._slugify(Path(document_path).stem)[:30]  # Limit length
+        return f"{doc_slug}_{hash_value[:16]}"
+    
+    def _slugify(self, text: str) -> str:
+        """Convert text to a safe ID component.
+        
+        Args:
+            text: Text to slugify
+            
+        Returns:
+            Safe string for use in IDs
+        """
+        # Normalize unicode
+        text = unicodedata.normalize('NFKD', text)
+        # Remove non-ASCII
+        text = text.encode('ascii', 'ignore').decode('ascii')
+        # Replace non-alphanumeric with underscores
+        text = re.sub(r'[^\w\s-]', '_', text)
+        # Replace multiple underscores/spaces with single underscore
+        text = re.sub(r'[_\s]+', '_', text)
+        # Strip and lowercase
+        return text.strip('_').lower() 
