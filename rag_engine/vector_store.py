@@ -180,33 +180,77 @@ class VectorStore:
             logger.error(f"Failed to get collection info: {e}")
             return {"error": str(e)}
     
-    def list_documents(self) -> List[Dict[str, Any]]:
+    def list_documents(self, batch_size: int = 1000) -> List[Dict[str, Any]]:
         """List all unique documents in the collection.
         
+        ChromaDB has a limit of 1000 items per get() call, so we need to paginate
+        through the results to get all documents.
+        
+        Args:
+            batch_size: Number of chunks to retrieve per batch (max 1000)
+            
         Returns:
             List of document metadata
         """
         try:
-            # Get count first
-            count = self.collection.count()
+            # Get total count
+            total_chunks = self.collection.count()
+            logger.debug(f"Total chunks in collection: {total_chunks}")
             
-            # Get all documents with explicit limit
-            results = self.collection.get(limit=count if count > 0 else 1000)
+            # If no chunks, return empty
+            if total_chunks == 0:
+                logger.info("No documents in collection")
+                return []
             
-            # Extract unique documents
+            # Collect all unique documents by paginating through chunks
             documents = {}
-            for i, metadata in enumerate(results['metadatas']):
-                doc_name = metadata.get('document', 'unknown')
-                if doc_name not in documents:
-                    documents[doc_name] = {
-                        'document': doc_name,
-                        'type': metadata.get('type', 'unknown'),
-                        'chunk_count': 0,
-                        'source': metadata.get('source', 'unknown')
-                    }
-                documents[doc_name]['chunk_count'] += 1
+            retrieved_count = 0
             
-            logger.info(f"Found {len(documents)} unique documents from {count} total chunks")
+            # ChromaDB doesn't support offset, so we need to use IDs for pagination
+            # First, get all IDs
+            all_ids = []
+            offset = 0
+            
+            while offset < total_chunks:
+                # Get a batch of results
+                batch_limit = min(batch_size, total_chunks - offset)
+                results = self.collection.get(
+                    limit=batch_limit,
+                    offset=offset
+                )
+                
+                # Process this batch
+                batch_size_actual = len(results.get('ids', []))
+                retrieved_count += batch_size_actual
+                
+                logger.debug(f"Retrieved batch at offset {offset}: {batch_size_actual} chunks")
+                
+                # Extract unique documents from this batch
+                for metadata in results.get('metadatas', []):
+                    doc_name = metadata.get('document', 'unknown')
+                    if doc_name not in documents:
+                        documents[doc_name] = {
+                            'document': doc_name,
+                            'type': metadata.get('type', 'unknown'),
+                            'chunk_count': 0,
+                            'source': metadata.get('source', 'unknown')
+                        }
+                    documents[doc_name]['chunk_count'] += 1
+                
+                # If we got fewer results than requested, we've reached the end
+                if batch_size_actual < batch_limit:
+                    logger.debug(f"Reached end of collection at offset {offset + batch_size_actual}")
+                    break
+                
+                # Move to next batch
+                offset += batch_size_actual
+            
+            logger.info(f"Found {len(documents)} unique documents from {retrieved_count} chunks (total: {total_chunks})")
+            
+            # Log document names for debugging if not too many
+            if len(documents) <= 10:
+                for doc_name in documents.keys():
+                    logger.debug(f"  - Document: {doc_name}")
             
             return list(documents.values())
             
