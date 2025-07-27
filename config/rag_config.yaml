@@ -3,7 +3,12 @@
 # LLM Configuration
 llm:
   type: "anthropic"  # openai, anthropic, ollama
-  model: "claude-4-opus"  # gpt-4, gpt-4o, gpt-3.5-turbo, claude-4-opus, claude-4-sonnet, claude-4-haiku, claude-3-opus-20240229, claude-3-sonnet-20240229, o3:8b, llama2
+  # For Anthropic: claude-3-opus-20240229, claude-3-sonnet-20240229, claude-3-haiku-20240307,
+  #               claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022
+  #               claude-4-opus, claude-4-sonnet, claude-4-haiku (when available)
+  # For OpenAI: gpt-4, gpt-4-turbo, gpt-3.5-turbo, gpt-4o
+  # For Ollama: llama2, llama3, mistral, codellama, o3, or any local model
+  model: "claude-3-5-sonnet-20241022"  # Updated to latest available model
   temperature: 0.1
   max_tokens: 2000
 

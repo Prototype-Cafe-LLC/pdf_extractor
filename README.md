@@ -126,15 +126,42 @@ For detailed setup instructions, see:
    python test_rag_basic.py
    ```
 
-4. **Start the MCP server**:
+4. **Configure and start the MCP server**:
+
+   For standalone testing:
 
    ```bash
-   python mcp_server.py
+   python src/mcp/simple_server.py
+   ```
+
+   For MCP clients (e.g., Claude Desktop), add to your MCP configuration:
+
+   ```json
+   {
+     "mcpServers": {
+       "pdf-rag-mcp": {
+         "command": "/path/to/pdf_extractor/.venv/bin/python",
+         "args": [
+           "/path/to/pdf_extractor/src/mcp/simple_server.py"
+         ],
+         "cwd": "/path/to/pdf_extractor",
+         "env": {
+           "FASTMCP_LOG_LEVEL": "ERROR",
+           "ANTHROPIC_API_KEY": "your-api-key",
+           "LLM_TYPE": "anthropic",
+           "LLM_MODEL": "claude-3-opus-20240229",
+           "EMBEDDING_MODEL": "sentence-transformers/all-MiniLM-L6-v2"
+         }
+       }
+     }
+   }
    ```
 
 #### Environment Variables
 
-Set these environment variables in your shell or `.env` file:
+The MCP server supports configuration through environment variables, which override settings in the YAML files:
+
+**Required API Keys (choose one):**
 
 ```bash
 # For OpenAI
@@ -146,6 +173,27 @@ export ANTHROPIC_API_KEY="sk-ant-your-anthropic-api-key"
 # For Ollama (no API key needed)
 # Just ensure Ollama is running: ollama serve
 ```
+
+**Optional Model Configuration:**
+
+```bash
+# Override LLM provider (anthropic, openai, ollama)
+export LLM_TYPE="anthropic"
+
+# Override LLM model
+export LLM_MODEL="claude-3-opus-20240229"
+
+# Override embedding model
+export EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2"
+```
+
+**Available Models:**
+
+- **Anthropic**:
+  - Claude 3 series: claude-3-opus-20240229, claude-3-sonnet-20240229, claude-3-haiku-20240307, claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022
+  - Claude 4 series: claude-4-opus, claude-4-sonnet, claude-4-haiku (when available)
+- **OpenAI**: gpt-4, gpt-4-turbo, gpt-3.5-turbo, gpt-4o
+- **Ollama**: llama2, llama3, mistral, codellama, o3 (or any locally installed model)
 
 **Note**: The API keys are used by the RAG system to generate intelligent
 responses. The basic PDF extraction functionality works without any API keys.
@@ -160,7 +208,9 @@ operations like listing documents or adding PDFs will work even without API keys
 Convert a single PDF file:
 
 ```bash
-python pdf_extractor.py document.pdf
+python -m src.pdf_extractor document.pdf
+# Or if installed via pip:
+pdf-extractor document.pdf
 ```
 
 This creates a `md` directory with the converted markdown file.
@@ -198,7 +248,7 @@ print("Confidence:", response.confidence)
 1. Start the MCP server:
 
    ```bash
-   python mcp_server.py
+   python src/mcp/simple_server.py
    ```
 
 2. In Claude Desktop or other MCP client, use these tools:
@@ -304,16 +354,31 @@ markdownlint "**/*.md"
 
 ```text
 pdf_extractor/
-├── pdf_extractor.py      # Main PDF extraction application
-├── mcp_server.py         # MCP server for RAG queries
-├── pyproject.toml        # Project configuration
-├── rag_engine/           # RAG components
-│   ├── __init__.py
-│   ├── chunking.py       # Document chunking strategies
-│   ├── embeddings.py     # Embedding generation
-│   ├── vector_store.py   # Vector database operations
-│   ├── llm_integration.py # LLM integration
-│   └── retrieval.py      # Complete RAG pipeline
+├── src/                  # Source code
+│   ├── pdf_extractor/    # PDF extraction module
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── cli.py        # Command-line interface
+│   │   └── converter.py  # PDF conversion logic
+│   ├── rag_engine/       # RAG components
+│   │   ├── __init__.py
+│   │   ├── chunking.py   # Document chunking strategies
+│   │   ├── embeddings.py # Embedding generation
+│   │   ├── vector_store.py # Vector database operations
+│   │   ├── llm_integration.py # LLM integration
+│   │   └── retrieval.py  # Complete RAG pipeline
+│   └── mcp/              # MCP server implementations
+│       ├── __init__.py
+│       ├── server.py     # Full MCP server
+│       └── simple_server.py # Simplified MCP server
+├── tests/                # Test suite
+│   ├── unit/             # Unit tests
+│   └── integration/      # Integration tests
+├── scripts/              # Utility scripts
+├── docs/                 # Documentation
+│   ├── setup/            # Setup guides
+│   ├── guides/           # User guides
+│   └── technical/        # Technical docs
 ├── config/               # Configuration files
 │   ├── rag_config.yaml   # RAG settings
 │   └── mcp_config.yaml   # MCP server settings
@@ -321,18 +386,11 @@ pdf_extractor/
 │   ├── chunks/           # Document chunks
 │   ├── embeddings/       # Embedding files
 │   └── vector_db/        # Vector database
-├── tests/                # Test suite
-│   ├── test_pdf_extractor.py
-│   └── test_rag_engine.py
-├── test_rag_basic.py     # Basic RAG functionality test
-├── PLAN.md              # Implementation plan
-├── RAG_README.md        # Detailed RAG documentation
-├── ANTHROPIC_SETUP.md   # Anthropic API setup guide
-├── OPENAI_SETUP.md      # OpenAI API setup guide
-├── OLLAMA_SETUP.md      # Ollama local setup guide
-├── MODEL_COMPARISON.md  # Opus vs O3 model comparison
-├── PRIVACY_POLICY.md    # Data usage and privacy policies
-└── README.md            # This file
+├── pyproject.toml        # Project configuration
+├── README.md             # This file
+├── CLAUDE.md             # Claude-specific guidance
+├── LICENSE               # MIT License
+└── PRIVACY_POLICY.md     # Data usage and privacy
 ```
 
 ## Error Handling
