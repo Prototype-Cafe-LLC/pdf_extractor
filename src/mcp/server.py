@@ -26,14 +26,17 @@ from mcp.types import (
 try:
     # Try relative import (when run as module)
     from ..rag_engine.retrieval import RAGEngine
+    from .logging_config import configure_mcp_logging, log_system_info
 except ImportError:
     # Fall back to absolute import (when run directly)
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     from src.rag_engine.retrieval import RAGEngine
+    from src.mcp.logging_config import configure_mcp_logging, log_system_info
 
-logger = logging.getLogger(__name__)
+# Configure logger with rotation
+logger = configure_mcp_logging(server_type="mcp", enable_console=True)
 
 
 class PDFRAGMCPServer:
@@ -179,18 +182,23 @@ class PDFRAGMCPServer:
         """Handle technical documentation queries."""
         question = arguments["question"]
         top_k = arguments.get("top_k", 5)
+        
+        logger.info(f"Query request received - Question length: {len(question)}, top_k: {top_k}")
 
         # Initialize RAG engine if not already done
         if not self.rag_engine:
             await self._initialize_rag_engine()
 
         if not self.rag_engine:
+            logger.error("Failed to initialize RAG engine for query")
             return CallToolResult(
                 content=[TextContent(type="text", text="Error: Failed to initialize RAG engine")]
             )
 
         # Get RAG response
+        logger.debug(f"Processing query: {question[:100]}...")
         response = self.rag_engine.query(question, top_k)
+        logger.info(f"Query processed successfully - Confidence: {response.confidence:.2f}, Sources: {len(response.sources)}")
 
         # Format response with sources
         answer = response.answer
@@ -229,8 +237,11 @@ class PDFRAGMCPServer:
         """Handle adding new PDF documents."""
         pdf_path = Path(arguments["pdf_path"])
         document_type = arguments.get("document_type", "unknown")
+        
+        logger.info(f"Add document request - Path: {pdf_path}, Type: {document_type}")
 
         if not pdf_path.exists():
+            logger.warning(f"PDF file not found: {pdf_path}")
             return CallToolResult(
                 content=[TextContent(type="text", text=f"Error: PDF file not found: {pdf_path}")]
             )
@@ -240,12 +251,19 @@ class PDFRAGMCPServer:
             await self._initialize_rag_engine()
 
         if not self.rag_engine:
+            logger.error("Failed to initialize RAG engine for document addition")
             return CallToolResult(
                 content=[TextContent(type="text", text="Error: Failed to initialize RAG engine")]
             )
 
         # Add document to knowledge base
+        logger.info(f"Adding document to knowledge base: {pdf_path.name}")
         success = self.rag_engine.add_pdf_document(pdf_path, document_type)
+        
+        if success:
+            logger.info(f"Successfully added document: {pdf_path.name}")
+        else:
+            logger.error(f"Failed to add document: {pdf_path.name}")
 
         if success:
             return CallToolResult(
@@ -369,27 +387,33 @@ class PDFRAGMCPServer:
 
 async def main():
     """Main entry point for MCP server."""
-    # Setup logging
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    # Log system information at startup
+    log_system_info(logger)
+    logger.info("Starting PDF RAG MCP Server...")
 
     server = PDFRAGMCPServer()
 
     # Run the server
-    async with stdio_server() as (read_stream, write_stream):
-        await server.server.run(
-            read_stream,
-            write_stream,
-            InitializationOptions(
-                server_name="pdf-rag-mcp",
-                server_version="1.0.0",
-                capabilities=server.server.get_capabilities(
-                    notification_options=NotificationOptions(tools_changed=False),
-                    experimental_capabilities={},
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            logger.info("MCP server started successfully")
+            await server.server.run(
+                read_stream,
+                write_stream,
+                InitializationOptions(
+                    server_name="pdf-rag-mcp",
+                    server_version="1.0.0",
+                    capabilities=server.server.get_capabilities(
+                        notification_options=NotificationOptions(tools_changed=False),
+                        experimental_capabilities={},
+                    ),
                 ),
-            ),
-        )
+            )
+    except Exception as e:
+        logger.error(f"MCP server failed: {e}", exc_info=True)
+        raise
+    finally:
+        logger.info("MCP server shutting down")
 
 
 if __name__ == "__main__":

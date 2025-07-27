@@ -1,0 +1,55 @@
+# Logging configuration for MCP servers
+# This file defines log rotation policies and logging behavior
+
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+  
+  # Directory for log files (relative to project root)
+  # Can be overridden by MCP_LOG_DIR environment variable
+  log_dir: logs
+  
+  # Rotation policy
+  rotation:
+    # Maximum size of each log file before rotation (in bytes)
+    # Default: 10MB (10 * 1024 * 1024)
+    # Can be overridden by MCP_LOG_MAX_BYTES environment variable
+    max_bytes: 10485760
+    
+    # Number of backup files to keep
+    # When this limit is reached, the oldest file is deleted
+    # Can be overridden by MCP_LOG_BACKUP_COUNT environment variable
+    backup_count: 5
+    
+    # Time-based rotation (optional, not implemented yet)
+    # Options: midnight, H (hourly), D (daily), W0-W6 (weekly)
+    # when: midnight
+    # interval: 1
+    # backup_count: 7
+  
+  # Console output
+  console:
+    # Whether to enable console logging
+    enabled: true
+    
+    # Console log level (typically less verbose than file)
+    level: INFO
+  
+  # Log format options
+  format:
+    # Include file name and line number in logs
+    include_location: true
+    
+    # Timestamp format
+    timestamp_format: "%Y-%m-%d %H:%M:%S"
+  
+  # Additional features
+  features:
+    # Log system information at startup
+    log_system_info: true
+    
+    # Log performance metrics
+    log_performance: false
+    
+    # Enable structured logging (JSON format)
+    structured_logging: false

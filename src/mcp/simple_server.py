@@ -23,14 +23,17 @@ from mcp.types import TextContent, Tool
 try:
     # Try relative import (when run as module)
     from ..rag_engine.retrieval import RAGEngine
+    from .logging_config import configure_mcp_logging, log_system_info
 except ImportError:
     # Fall back to absolute import (when run directly)
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     from src.rag_engine.retrieval import RAGEngine
+    from src.mcp.logging_config import configure_mcp_logging, log_system_info
 
-logger = logging.getLogger(__name__)
+# Configure logger with rotation
+logger = configure_mcp_logging(server_type="simple", enable_console=True)
 
 # Constants for resource limits
 MAX_FILES_PER_BATCH = 100
@@ -291,23 +294,33 @@ class SimplePDFRAGMCPServer:
         @self.server.call_tool()
         async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             """Handle tool calls."""
+            logger.info(f"Tool call received: {name}")
+            start_time = asyncio.get_event_loop().time()
+            
             try:
                 if name == "pdfrag.query_technical_docs":
-                    return await self._handle_query(arguments)
+                    result = await self._handle_query(arguments)
                 elif name == "pdfrag.add_document":
-                    return await self._handle_add_document(arguments)
+                    result = await self._handle_add_document(arguments)
                 elif name == "pdfrag.add_documents":
-                    return await self._handle_add_documents(arguments)
+                    result = await self._handle_add_documents(arguments)
                 elif name == "pdfrag.list_documents":
-                    return await self._handle_list_documents()
+                    result = await self._handle_list_documents()
                 elif name == "pdfrag.get_system_info":
-                    return await self._handle_get_system_info()
+                    result = await self._handle_get_system_info()
                 elif name == "pdfrag.clear_database":
-                    return await self._handle_clear_database(arguments)
+                    result = await self._handle_clear_database(arguments)
                 else:
-                    return [TextContent(type="text", text=f"Unknown tool: {name}")]
+                    logger.warning(f"Unknown tool called: {name}")
+                    result = [TextContent(type="text", text=f"Unknown tool: {name}")]
+                
+                elapsed_time = asyncio.get_event_loop().time() - start_time
+                logger.info(f"Tool call completed: {name} - Duration: {elapsed_time:.2f}s")
+                return result
+                
             except Exception as e:
-                logger.error(f"Tool call failed: {e}")
+                elapsed_time = asyncio.get_event_loop().time() - start_time
+                logger.error(f"Tool call failed: {name} - Duration: {elapsed_time:.2f}s - Error: {e}", exc_info=True)
                 return [TextContent(type="text", text=f"Error: {str(e)}")]
 
     async def _handle_get_system_info(self) -> list[TextContent]:
@@ -416,9 +429,12 @@ class SimplePDFRAGMCPServer:
         """Handle technical documentation queries."""
         question = arguments.get("question", "")
         top_k = arguments.get("top_k", 5)
+        
+        logger.info(f"Query request - Question length: {len(question)}, top_k: {top_k}")
 
         # Input validation
         if not question:
+            logger.warning("Query request with empty question")
             return [TextContent(type="text", text="Error: No question provided")]
 
         if len(question) > MAX_QUERY_LENGTH:
@@ -447,10 +463,13 @@ class SimplePDFRAGMCPServer:
 
         # Get RAG response asynchronously
         try:
+            logger.debug(f"Processing query: {question[:100]}...")
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None, partial(self.rag_engine.query, question, top_k)
             )
+            
+            logger.info(f"Query completed - Confidence: {response.confidence:.2f}, Sources: {len(response.sources)}")
 
             # Format response with sources
             answer = response.answer
@@ -819,27 +838,33 @@ class SimplePDFRAGMCPServer:
 
 async def main():
     """Main entry point for MCP server."""
-    # Setup logging
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    # Log system information at startup
+    log_system_info(logger)
+    logger.info("Starting Simple PDF RAG MCP Server...")
 
     server = SimplePDFRAGMCPServer()
 
     # Run the server
-    async with stdio_server() as (read_stream, write_stream):
-        await server.server.run(
-            read_stream,
-            write_stream,
-            InitializationOptions(
-                server_name="pdf-rag-mcp",
-                server_version="1.0.0",
-                capabilities=server.server.get_capabilities(
-                    notification_options=NotificationOptions(tools_changed=False),
-                    experimental_capabilities={},
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            logger.info("Simple MCP server started successfully")
+            await server.server.run(
+                read_stream,
+                write_stream,
+                InitializationOptions(
+                    server_name="pdf-rag-mcp",
+                    server_version="1.0.0",
+                    capabilities=server.server.get_capabilities(
+                        notification_options=NotificationOptions(tools_changed=False),
+                        experimental_capabilities={},
+                    ),
                 ),
-            ),
-        )
+            )
+    except Exception as e:
+        logger.error(f"Simple MCP server failed: {e}", exc_info=True)
+        raise
+    finally:
+        logger.info("Simple MCP server shutting down")
 
 
 # Create global server instance for mcp dev

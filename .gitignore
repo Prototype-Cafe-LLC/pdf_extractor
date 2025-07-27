@@ -61,6 +61,8 @@ md/
 !README.md
 !CLAUDE.md
 !test/resources/README.md
+!PRIVACY_POLICY.md
+!docs/**/*.md
 
 # Data and binary files
 data/
@@ -71,6 +73,11 @@ data/
 
 # Vector database files
 data/vector_db/
+
+# Log files
+logs/
+*.log
+*.log.*
 
 # Test scripts (temporary)
 test_*.py

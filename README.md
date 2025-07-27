@@ -29,6 +29,7 @@ and structure.
 - 🌐 **Multi-LLM Support**: OpenAI (GPT-4, GPT-4o), Anthropic (Claude 4 Opus,
   Claude 3), and Ollama (O3, Llama 3.1) integration
 - 📈 **Vector Database**: Persistent storage with ChromaDB
+- 📝 **Rotating Logs**: Server logs with automatic rotation for debugging and monitoring
 
 ## Installation
 
@@ -185,6 +186,22 @@ export LLM_MODEL="claude-3-opus-20240229"
 
 # Override embedding model
 export EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2"
+```
+
+**Logging Configuration:**
+
+```bash
+# Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+export MCP_LOG_LEVEL="INFO"
+
+# Override log directory (defaults to ./logs)
+export MCP_LOG_DIR="/path/to/logs"
+
+# Set log rotation size (in bytes, default: 10MB)
+export MCP_LOG_MAX_BYTES="10485760"
+
+# Set number of backup files to keep (default: 5)
+export MCP_LOG_BACKUP_COUNT="5"
 ```
 
 **Available Models:**
@@ -381,11 +398,13 @@ pdf_extractor/
 │   └── technical/        # Technical docs
 ├── config/               # Configuration files
 │   ├── rag_config.yaml   # RAG settings
-│   └── mcp_config.yaml   # MCP server settings
+│   ├── mcp_config.yaml   # MCP server settings
+│   └── logging_config.yaml # Logging configuration
 ├── data/                 # Data storage
 │   ├── chunks/           # Document chunks
 │   ├── embeddings/       # Embedding files
 │   └── vector_db/        # Vector database
+├── logs/                 # Server logs (auto-created)
 ├── pyproject.toml        # Project configuration
 ├── README.md             # This file
 ├── CLAUDE.md             # Claude-specific guidance
@@ -402,6 +421,41 @@ The tool handles various error scenarios gracefully:
 - **Corrupted PDFs**: Logs error and continues with other files
 - **Permission errors**: Reports access issues
 - **Password-protected PDFs**: Skips with warning
+
+## Monitoring and Debugging
+
+### Server Logs
+
+The MCP servers maintain rotating log files for debugging and monitoring:
+
+- **Log location**: `./logs/` directory (configurable via `MCP_LOG_DIR`)
+- **Log files**:
+  - `mcp_server.log` - Main MCP server logs
+  - `simple_server.log` - Simple MCP server logs
+- **Rotation policy**:
+  - Default: 10MB per file, keeping 5 backups
+  - Configurable via environment variables or `config/logging_config.yaml`
+
+### Viewing Logs
+
+```bash
+# View recent logs
+tail -f logs/mcp_server.log
+
+# Search for errors
+grep ERROR logs/mcp_server.log
+
+# View all log files
+ls -la logs/
+```
+
+### Log Levels
+
+- **DEBUG**: Detailed information for debugging
+- **INFO**: General informational messages
+- **WARNING**: Warning messages for potential issues
+- **ERROR**: Error messages for failures
+- **CRITICAL**: Critical failures requiring immediate attention
 
 ## Output Format
 
