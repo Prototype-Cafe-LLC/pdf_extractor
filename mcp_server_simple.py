@@ -819,5 +819,8 @@ async def main():
         )
 
 
+# Create global server instance for mcp dev
+server = SimplePDFRAGMCPServer().server
+
 if __name__ == "__main__":
     asyncio.run(main())
