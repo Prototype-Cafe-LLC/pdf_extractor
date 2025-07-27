@@ -4,6 +4,57 @@ Convert PDF files to Markdown format with ease. This command-line tool uses
 `pymupdf4llm` to extract content from PDFs while preserving formatting, tables,
 and structure.
 
+## 🚀 Quick Start (5-minute setup)
+
+For busy users who want to get the MCP server running quickly:
+
+### 1. Clone and Install (2 minutes)
+
+```bash
+git clone git@github.com:Prototype-Cafe-LLC/pdf_extractor.git
+cd pdf_extractor
+./install.sh
+```
+
+That's it! The install script handles everything including uv installation.
+
+### 2. Configure MCP Server (1 minute)
+
+Add to your Claude Desktop config file:
+`~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "pdf-rag": {
+      "command": "/path/to/pdf_extractor/.venv/bin/python",
+      "args": ["/path/to/pdf_extractor/src/mcp/simple_server.py"],
+      "env": {
+        "ANTHROPIC_API_KEY": "your-api-key"
+        // Optional overrides (defaults shown):
+        // "LLM_TYPE": "anthropic",
+        // "LLM_MODEL": "claude-3-5-sonnet-20241022",
+        // "EMBEDDING_MODEL": "sentence-transformers/all-MiniLM-L6-v2"
+      }
+    }
+  }
+}
+```
+
+**Note**: Only `ANTHROPIC_API_KEY` is required. The server uses sensible defaults
+for other settings. For OpenAI, use `OPENAI_API_KEY` and set `LLM_TYPE` to "openai".
+
+### 3. Start Using (1 minute)
+
+Restart Claude Desktop and start chatting:
+
+- **Add PDFs**: "Add the PDF at /path/to/manual.pdf to the knowledge base"
+- **Add folders**: "Add all PDFs from /Users/me/Documents/manuals"
+- **Ask questions**: "What does the manual say about network configuration?"
+- **List documents**: "Show me all documents in the knowledge base"
+
+That's it! You're ready to query your PDF documents with AI.
+
 ## Features
 
 ### PDF Extraction
@@ -160,7 +211,8 @@ For detailed setup instructions, see:
 
 #### Environment Variables
 
-The MCP server supports configuration through environment variables, which override settings in the YAML files:
+The MCP server supports configuration through environment variables, which
+override settings in the YAML files:
 
 **Required API Keys (choose one):**
 
@@ -207,7 +259,8 @@ export MCP_LOG_BACKUP_COUNT="5"
 **Available Models:**
 
 - **Anthropic**:
-  - Claude 3 series: claude-3-opus-20240229, claude-3-sonnet-20240229, claude-3-haiku-20240307, claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022
+  - Claude 3 series: claude-3-opus-20240229, claude-3-sonnet-20240229,
+    claude-3-haiku-20240307, claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022
   - Claude 4 series: claude-4-opus, claude-4-sonnet, claude-4-haiku (when available)
 - **OpenAI**: gpt-4, gpt-4-turbo, gpt-3.5-turbo, gpt-4o
 - **Ollama**: llama2, llama3, mistral, codellama, o3 (or any locally installed model)
@@ -270,10 +323,13 @@ print("Confidence:", response.confidence)
 
 2. In Claude Desktop or other MCP client, use these tools:
 
-   - `query_technical_docs`: Ask questions about technical documentation
-   - `add_pdf_document`: Add new PDF documents to knowledge base
-   - `list_documents`: List available documents
-   - `get_system_info`: Get system status and component health
+   - `pdfrag.query_technical_docs`: Ask questions about technical documentation
+   - `pdfrag.add_document`: Add a single PDF document to knowledge base
+   - `pdfrag.add_documents`: Add multiple PDF documents from a folder
+   - `pdfrag.list_documents`: List all documents in the knowledge base
+   - `pdfrag.get_system_info`: Get system status and component health
+   - `pdfrag.clear_database`: Clear the vector database (removes
+     embeddings/chunks only)
 
 #### Example MCP Queries
 
