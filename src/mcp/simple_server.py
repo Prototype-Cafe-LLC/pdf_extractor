@@ -20,7 +20,15 @@ from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
-from ..rag_engine.retrieval import RAGEngine
+try:
+    # Try relative import (when run as module)
+    from ..rag_engine.retrieval import RAGEngine
+except ImportError:
+    # Fall back to absolute import (when run directly)
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from src.rag_engine.retrieval import RAGEngine
 
 logger = logging.getLogger(__name__)
 
@@ -39,16 +47,18 @@ class SimplePDFRAGMCPServer:
         """Initialize the MCP server."""
         self.server = Server("pdf-rag-mcp")
         self._script_dir = Path(__file__).parent.absolute()
+        # Get project root directory (two levels up from src/mcp/)
+        self._project_root = self._script_dir.parent.parent
         self.config = self._load_config()
         self.rag_engine = None
         self.setup_handlers()
 
     def _load_config(self) -> dict[str, Any]:
-        """Load configuration from files."""
+        """Load configuration from files and environment variables."""
         config = {}
 
         # Load RAG config
-        rag_config_path = self._script_dir / "config" / "rag_config.yaml"
+        rag_config_path = self._project_root / "config" / "rag_config.yaml"
         if rag_config_path.exists():
             try:
                 with open(rag_config_path) as f:
@@ -58,7 +68,7 @@ class SimplePDFRAGMCPServer:
                 logger.error(f"Failed to load RAG config: {e}")
 
         # Load MCP config
-        mcp_config_path = self._script_dir / "config" / "mcp_config.yaml"
+        mcp_config_path = self._project_root / "config" / "mcp_config.yaml"
         if mcp_config_path.exists():
             try:
                 with open(mcp_config_path) as f:
@@ -66,6 +76,19 @@ class SimplePDFRAGMCPServer:
                 logger.info(f"Loaded MCP configuration from {mcp_config_path}")
             except Exception as e:
                 logger.error(f"Failed to load MCP config: {e}")
+
+        # Override with environment variables if set
+        if os.environ.get("LLM_TYPE"):
+            config.setdefault("llm", {})["type"] = os.environ["LLM_TYPE"]
+            logger.info(f"Using LLM type from env: {os.environ['LLM_TYPE']}")
+        
+        if os.environ.get("LLM_MODEL"):
+            config.setdefault("llm", {})["model"] = os.environ["LLM_MODEL"]
+            logger.info(f"Using LLM model from env: {os.environ['LLM_MODEL']}")
+        
+        if os.environ.get("EMBEDDING_MODEL"):
+            config.setdefault("embedding", {})["model"] = os.environ["EMBEDDING_MODEL"]
+            logger.info(f"Using embedding model from env: {os.environ['EMBEDDING_MODEL']}")
 
         return config
 
@@ -85,13 +108,13 @@ class SimplePDFRAGMCPServer:
 
         # Resolve to absolute path, following symlinks
         if not path_obj.is_absolute():
-            resolved_path = (self._script_dir / path_obj).resolve()
+            resolved_path = (self._project_root / path_obj).resolve()
         else:
             resolved_path = path_obj.resolve()
 
         # Security check: ensure path is within allowed directories
         allowed_dirs = [
-            self._script_dir,
+            self._project_root,
             Path.home(),  # User's home directory
             Path("/tmp"),  # Temporary directory
         ]

@@ -7,6 +7,7 @@ RAG-powered technical documentation queries through standardized tools.
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,15 @@ from mcp.types import (
     Tool,
 )
 
-from ..rag_engine.retrieval import RAGEngine
+try:
+    # Try relative import (when run as module)
+    from ..rag_engine.retrieval import RAGEngine
+except ImportError:
+    # Fall back to absolute import (when run directly)
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from src.rag_engine.retrieval import RAGEngine
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +42,8 @@ class PDFRAGMCPServer:
     def __init__(self):
         """Initialize the MCP server."""
         self.server = Server("pdf-rag-mcp")
+        # Get project root directory (two levels up from src/mcp/)
+        self._project_root = Path(__file__).parent.parent.parent
         self.rag_engine = None
         self.config = self._load_config()
         self.setup_handlers()
@@ -46,7 +57,7 @@ class PDFRAGMCPServer:
         config = {}
 
         # Load RAG config
-        rag_config_path = Path("config/rag_config.yaml")
+        rag_config_path = self._project_root / "config" / "rag_config.yaml"
         if rag_config_path.exists():
             try:
                 with open(rag_config_path) as f:
@@ -56,7 +67,7 @@ class PDFRAGMCPServer:
                 logger.error(f"Failed to load RAG config: {e}")
 
         # Load MCP config
-        mcp_config_path = Path("config/mcp_config.yaml")
+        mcp_config_path = self._project_root / "config" / "mcp_config.yaml"
         if mcp_config_path.exists():
             try:
                 with open(mcp_config_path) as f:
@@ -64,6 +75,19 @@ class PDFRAGMCPServer:
                 logger.info("Loaded MCP configuration")
             except Exception as e:
                 logger.error(f"Failed to load MCP config: {e}")
+
+        # Override with environment variables if set
+        if os.environ.get("LLM_TYPE"):
+            config.setdefault("llm", {})["type"] = os.environ["LLM_TYPE"]
+            logger.info(f"Using LLM type from env: {os.environ['LLM_TYPE']}")
+        
+        if os.environ.get("LLM_MODEL"):
+            config.setdefault("llm", {})["model"] = os.environ["LLM_MODEL"]
+            logger.info(f"Using LLM model from env: {os.environ['LLM_MODEL']}")
+        
+        if os.environ.get("EMBEDDING_MODEL"):
+            config.setdefault("embedding", {})["model"] = os.environ["EMBEDDING_MODEL"]
+            logger.info(f"Using embedding model from env: {os.environ['EMBEDDING_MODEL']}")
 
         return config
 
