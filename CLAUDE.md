@@ -34,16 +34,19 @@ npm install -g markdownlint-cli
 
 ```bash
 # Convert a single PDF file
-python pdf_extractor.py document.pdf -o output_folder
+python -m src.pdf_extractor document.pdf -o output_folder
 
 # Convert multiple PDF files
-python pdf_extractor.py doc1.pdf doc2.pdf doc3.pdf -o output_folder
+python -m src.pdf_extractor doc1.pdf doc2.pdf doc3.pdf -o output_folder
 
 # Convert all PDFs in a directory
-python pdf_extractor.py /path/to/pdf/folder -o output_folder
+python -m src.pdf_extractor /path/to/pdf/folder -o output_folder
 
 # Use default output directory (creates 'md' subfolder)
-python pdf_extractor.py document.pdf
+python -m src.pdf_extractor document.pdf
+
+# Or use the installed command (after pip install)
+pdf-extractor document.pdf
 ```
 
 ### Testing
@@ -66,7 +69,7 @@ uv run ruff format .
 uv run ruff check .
 
 # Type checking with mypy
-uv run mypy pdf_extractor.py
+uv run mypy src/
 
 # Validate markdown files with markdownlint
 markdownlint "**/*.md"
@@ -79,12 +82,25 @@ markdownlint --fix "**/*.md"
 
 ### Core Components
 
-1. **pdf_extractor.py** - Main entry point
-   - Handles command-line argument parsing
-   - Manages file/directory input processing
-   - Coordinates the conversion workflow
+1. **src/pdf_extractor/** - PDF conversion module
+   - **cli.py**: Main entry point
+   - **converter.py**: Core conversion logic
+     - Handles command-line argument parsing
+     - Manages file/directory input processing
+     - Coordinates the conversion workflow
 
-2. **PDF Processing Flow**
+2. **src/rag_engine/** - RAG (Retrieval-Augmented Generation) system
+   - **chunking.py**: Document chunking logic
+   - **embeddings.py**: Text embedding generation
+   - **llm_integration.py**: LLM provider interfaces
+   - **retrieval.py**: Main RAG engine
+   - **vector_store.py**: Vector database management
+
+3. **src/mcp/** - MCP (Model Context Protocol) server
+   - **server.py**: Full MCP server implementation
+   - **simple_server.py**: Simplified MCP server
+
+4. **PDF Processing Flow**
    - Input validation (file exists, is PDF)
    - PDF to Markdown conversion using pymupdf4llm
    - Output file generation with proper naming

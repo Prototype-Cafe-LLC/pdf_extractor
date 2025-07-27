@@ -22,7 +22,7 @@ from mcp.types import (
     Tool,
 )
 
-from rag_engine.retrieval import RAGEngine
+from ..rag_engine.retrieval import RAGEngine
 
 logger = logging.getLogger(__name__)
 

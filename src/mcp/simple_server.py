@@ -20,7 +20,7 @@ from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
-from rag_engine.retrieval import RAGEngine
+from ..rag_engine.retrieval import RAGEngine
 
 logger = logging.getLogger(__name__)
 
