@@ -126,7 +126,7 @@ markdownlint --fix "**/*.md"
 - Preserve PDF structure in Markdown (headings, lists, tables)
 - Handle images by extracting and saving separately if needed
 - Maintain original formatting as much as possible
-- Preserve technical content like AT command sequences accurately
+- Preserve technical content and formatting accurately
 - Ensure Japanese text is properly extracted and encoded
 
 ### Markdown Quality

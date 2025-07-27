@@ -184,10 +184,10 @@ with open("config/rag_config.yaml", 'r') as f:
 rag = RAGEngine(config)
 
 # Add PDF document to knowledge base
-rag.add_pdf_document("path/to/manual.pdf", "at_commands")
+rag.add_pdf_document("path/to/document.pdf", "manual")
 
 # Query the knowledge base
-response = rag.query("What is the AT command for checking signal quality?")
+response = rag.query("How do I configure the network settings?")
 print("Answer:", response.answer)
 print("Sources:", response.sources)
 print("Confidence:", response.confidence)
@@ -212,15 +212,15 @@ print("Confidence:", response.confidence)
 
 ```json
 {
-  "question": "What is the AT+CSQ command used for?",
+  "question": "How do I set up the device configuration?",
   "top_k": 3
 }
 ```
 
 ```json
 {
-  "pdf_path": "/path/to/quectel_manual.pdf",
-  "document_type": "at_commands"
+  "pdf_path": "/path/to/technical_manual.pdf",
+  "document_type": "manual"
 }
 ```
 
