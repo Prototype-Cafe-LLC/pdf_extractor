@@ -22,6 +22,12 @@ dependencies = [
     "numpy>=1.24.0",
     "tiktoken>=0.5.0",
     "pyyaml>=6.0",
+    # HTTP Server
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.6",
 ]
 
 [project.optional-dependencies]

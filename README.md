@@ -6,9 +6,13 @@ and structure.
 
 ## 🚀 Quick Start (5-minute setup)
 
+Choose your preferred setup:
+
+### Option A: MCP Server for Claude Desktop
+
 For busy users who want to get the MCP server running quickly:
 
-### 1. Clone and Install (2 minutes)
+#### 1. Clone and Install (2 minutes)
 
 ```bash
 git clone git@github.com:Prototype-Cafe-LLC/pdf_extractor.git
@@ -18,7 +22,7 @@ cd pdf_extractor
 
 That's it! The install script handles everything including uv installation.
 
-### 2. Configure MCP Server (1 minute)
+#### 2. Configure MCP Server (1 minute)
 
 Add to your Claude Desktop config file:
 `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -44,7 +48,7 @@ Add to your Claude Desktop config file:
 **Note**: Only `ANTHROPIC_API_KEY` is required. The server uses sensible defaults
 for other settings. For OpenAI, use `OPENAI_API_KEY` and set `LLM_TYPE` to "openai".
 
-### 3. Start Using (1 minute)
+#### 3. Start Using (1 minute)
 
 Restart Claude Desktop and start chatting:
 
@@ -54,6 +58,63 @@ Restart Claude Desktop and start chatting:
 - **List documents**: "Show me all documents in the knowledge base"
 
 That's it! You're ready to query your PDF documents with AI.
+
+### Option B: HTTP API Server for Team Access
+
+For teams who want a shared API server:
+
+#### 1. Install (same as above)
+
+Use the same installation steps from Option A.
+
+#### 2. Configure HTTP Server (2 minutes)
+
+```bash
+# Generate secure credentials
+export JWT_SECRET_KEY="$(openssl rand -base64 32)"
+export ADMIN_USERNAME="admin"
+
+# Generate password hash (you'll be prompted for password)
+python scripts/generate_password_hash.py
+# Copy the generated hash and export it:
+export ADMIN_PASSWORD_HASH="$2b$12$..."
+
+# Set API keys (format: key:name:rate_limit)
+export API_KEYS="prod-key-1:production:5000,dev-key-1:development:1000"
+
+# Set LLM API key (choose one)
+export ANTHROPIC_API_KEY="your-anthropic-key"  # For Claude
+# OR
+export OPENAI_API_KEY="your-openai-key"  # For GPT-4
+```
+
+#### 3. Start Server (1 minute)
+
+```bash
+# Start the HTTP server
+python -m src.mcp.http_server
+
+# Server is now running at http://localhost:8000
+# API docs available at http://localhost:8000/docs
+```
+
+#### 4. Quick Test
+
+```bash
+# Test with curl
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "your-password"}'
+
+# Or use the Python client
+python -c "
+from src.mcp.http_client import PDFRAGClient
+client = PDFRAGClient(username='admin', password='your-password')
+print(client.health_check())
+"
+```
+
+That's it! Your HTTP API server is ready for team use.
 
 ## Features
 
@@ -81,6 +142,8 @@ That's it! You're ready to query your PDF documents with AI.
   Claude 3), and Ollama (O3, Llama 3.1) integration
 - 📈 **Vector Database**: Persistent storage with ChromaDB
 - 📝 **Rotating Logs**: Server logs with automatic rotation for debugging and monitoring
+- 🚀 **HTTP API Server**: RESTful API with JWT/API key authentication for team collaboration
+- 📦 **Python SDK**: Client library for easy integration with the HTTP API
 
 ## Installation
 
@@ -186,7 +249,7 @@ For detailed setup instructions, see:
    python src/mcp/simple_server.py
    ```
 
-   For MCP clients (e.g., Claude Desktop), add to your MCP configuration:
+   For MCP clients (e.g., Claude Desktop, Cursor), add to your MCP configuration:
 
    ```json
    {
@@ -196,7 +259,6 @@ For detailed setup instructions, see:
          "args": [
            "/path/to/pdf_extractor/src/mcp/simple_server.py"
          ],
-         "cwd": "/path/to/pdf_extractor",
          "env": {
            "FASTMCP_LOG_LEVEL": "ERROR",
            "ANTHROPIC_API_KEY": "your-api-key",
@@ -208,6 +270,14 @@ For detailed setup instructions, see:
      }
    }
    ```
+
+   **Note**: The current MCP servers use stdio (standard input/output) transport.
+   For HTTP-based access, use the HTTP API server (see HTTP API Server section below).
+
+   **Troubleshooting MCP Configuration**:
+   - If you get "ModuleNotFoundError", use the direct file path in args instead of `-m`
+   - Ensure the Python path points to your virtual environment's Python
+   - The `cwd` parameter is optional but can help with module resolution
 
 #### Environment Variables
 
@@ -270,6 +340,83 @@ responses. The basic PDF extraction functionality works without any API keys.
 
 **Important**: The LLM is initialized lazily (only when making queries), so
 operations like listing documents or adding PDFs will work even without API keys.
+
+### Understanding MCP vs HTTP Servers
+
+This project includes two different server types:
+
+1. **MCP Server** (`src.mcp.simple_server`) - For AI assistants like Claude Desktop, Cursor
+   - Uses stdio (standard input/output) transport
+   - Direct integration with AI tools
+   - No authentication needed (handled by the client)
+
+2. **HTTP API Server** (`src.mcp.http_server`) - For web applications and APIs
+   - Uses HTTP/HTTPS transport
+   - JWT and API key authentication
+   - RESTful API endpoints
+   - Team collaboration features
+
+### HTTP API Server (New!)
+
+The PDF RAG system now includes a RESTful HTTP API server for team collaboration
+and remote access:
+
+**Features**:
+
+- 🔐 JWT and API key authentication
+- 🌐 RESTful API endpoints
+- 🚀 Async FastAPI implementation
+- 📦 Python client SDK included
+- 🛡️ Enhanced security with path validation
+- 📊 Rate limiting and CORS support
+
+**Quick Start**:
+
+1. **Set environment variables**:
+
+   ```bash
+   export JWT_SECRET_KEY="your-secure-secret-key"
+   export ADMIN_USERNAME="admin"
+   export ADMIN_PASSWORD_HASH="$(python scripts/generate_password_hash.py)"
+   export API_KEYS="key1:service1:1000,key2:service2:5000"
+   ```
+
+2. **Start the HTTP server**:
+
+   ```bash
+   python -m src.mcp.http_server
+   # Or with custom settings
+   uvicorn src.mcp.http_server:app --host 0.0.0.0 --port 8000 --workers 4
+   ```
+
+3. **Use the Python client**:
+
+   ```python
+   from src.mcp.http_client import PDFRAGClient
+   
+   # Using API key
+   client = PDFRAGClient(api_key="your-api-key")
+   
+   # Query documents
+   result = client.query("How does the system work?")
+   print(result['answer'])
+   
+   # Add documents
+   client.add_document("/path/to/document.pdf", "manual")
+   ```
+
+**API Endpoints**:
+
+- `POST /api/auth/login` - Get JWT token
+- `GET /api/health` - Health check
+- `POST /api/query` - Query documents
+- `POST /api/documents` - Add single document
+- `POST /api/documents/batch` - Add multiple documents
+- `GET /api/documents` - List all documents
+- `GET /api/system/info` - Get system info
+- `DELETE /api/database` - Clear database
+
+See [docs/HTTP_SERVER_README.md](docs/HTTP_SERVER_README.md) for complete documentation.
 
 ## Usage
 

@@ -1,0 +1,90 @@
+# HTTP Server Configuration
+# This file configures the HTTP API server for the PDF RAG system
+
+http_server:
+  # Server host and port
+  host: "0.0.0.0"  # Listen on all interfaces
+  port: 8080
+  
+  # Number of worker processes (for production use)
+  workers: 1
+  
+  # CORS configuration
+  cors_origins:
+    - "http://localhost:3000"  # React/Vue/Angular dev server
+    - "http://localhost:8080"  # Alternative frontend
+    - "https://yourdomain.com"  # Production frontend
+  
+  # Request limits
+  max_upload_size_mb: 50
+  max_files_per_batch: 100
+  max_query_length: 1000
+  
+  # Rate limiting (requests per hour)
+  rate_limits:
+    default: 100
+    authenticated: 1000
+    api_key: 5000
+
+# Authentication settings
+auth:
+  # JWT settings
+  jwt_algorithm: "HS256"
+  access_token_expire_minutes: 60  # 1 hour (reduced for security)
+  
+  # API key settings
+  api_key_header: "X-API-Key"
+  
+  # SECURITY: Authentication credentials must be set via environment variables:
+  # - JWT_SECRET_KEY: Required for JWT token signing
+  # - ADMIN_USERNAME: Admin username
+  # - ADMIN_PASSWORD_HASH: Bcrypt hash of admin password
+  # - API_KEYS: Comma-separated list of key:name:limit
+  #
+  # Example:
+  # export JWT_SECRET_KEY="your-secret-key-here"
+  # export ADMIN_USERNAME="admin"
+  # export ADMIN_PASSWORD_HASH="$2b$12$..."  # Use bcrypt to generate
+  # export API_KEYS="key1:service1:1000,key2:service2:5000"
+
+# TLS/SSL Configuration (for production)
+tls:
+  enabled: false
+  cert_file: "/path/to/cert.pem"
+  key_file: "/path/to/key.pem"
+  
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "json"  # or "text"
+  file: "logs/http_server.log"
+  max_size_mb: 100
+  backup_count: 5
+
+# Security headers
+security:
+  # Content Security Policy
+  csp: "default-src 'self'"
+  
+  # Other security headers
+  headers:
+    X-Content-Type-Options: "nosniff"
+    X-Frame-Options: "DENY"
+    X-XSS-Protection: "1; mode=block"
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+
+# Monitoring and metrics
+monitoring:
+  enabled: false
+  prometheus_port: 9090
+  health_check_path: "/api/health"
+
+# Environment-specific overrides
+# These can be set via environment variables:
+# - HTTP_SERVER_HOST
+# - HTTP_SERVER_PORT
+# - JWT_SECRET_KEY
+# - DEFAULT_API_KEY
+# - LLM_TYPE
+# - LLM_MODEL
+# - EMBEDDING_MODEL

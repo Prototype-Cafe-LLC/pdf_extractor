@@ -57,9 +57,7 @@ dmypy.json
 
 # Project specific
 md/
-*.md
-!README.md
-!CLAUDE.md
+TODO.md
 !test/resources/README.md
 !PRIVACY_POLICY.md
 !docs/**/*.md
@@ -81,6 +79,7 @@ logs/
 
 # Test scripts (temporary)
 test_*.py
+!scripts/test_*.py
 debug_*.py
 verify_*.py
 
