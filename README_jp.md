@@ -69,24 +69,43 @@ Claude Desktopを再起動してチャットを開始：
 
 #### 2. HTTPサーバーの設定（2分）
 
+##### 必須設定
+
 ```bash
-# セキュアな認証情報を生成
+# 必須：LLM APIキーを設定（いずれか1つを選択）
+export ANTHROPIC_API_KEY="your-anthropic-key"  # Claude用
+# または
+export OPENAI_API_KEY="your-openai-key"  # GPT-4用
+
+# 必須：認証用のJWTシークレット
 export JWT_SECRET_KEY="$(openssl rand -base64 32)"
+```
+
+##### オプション認証設定
+
+認証方法を1つまたは両方選択できます：
+
+##### オプション1：ユーザー名/パスワード認証（オプション）
+
+```bash
+# 管理者ユーザー名を設定（オプション、WebUIログイン用）
 export ADMIN_USERNAME="admin"
 
 # パスワードハッシュを生成（パスワードの入力を求められます）
 python scripts/generate_password_hash.py
 # 生成されたハッシュをコピーしてエクスポート：
 export ADMIN_PASSWORD_HASH="$2b$12$..."
-
-# APIキーを設定（形式：key:name:rate_limit）
-export API_KEYS="prod-key-1:production:5000,dev-key-1:development:1000"
-
-# LLM APIキーを設定（いずれか1つを選択）
-export ANTHROPIC_API_KEY="your-anthropic-key"  # Claude用
-# または
-export OPENAI_API_KEY="your-openai-key"  # GPT-4用
 ```
+
+##### オプション2：APIキー認証（オプション）
+
+```bash
+# サービス間認証用のAPIキーを設定（形式：key:name:rate_limit）
+export API_KEYS="prod-key-1:production:5000,dev-key-1:development:1000"
+```
+
+**注意**：認証情報を設定しない場合、すべてのAPIエンドポイントは401 Unauthorizedを
+返します。使用ケースに最適な認証方法を選択してください。
 
 #### 3. サーバー起動（1分）
 
@@ -373,9 +392,15 @@ PDF RAGシステムにはチームコラボレーションとリモートアク�
 1. **環境変数を設定**：
 
    ```bash
+   # 必須：トークン署名用のJWTシークレット
    export JWT_SECRET_KEY="your-secure-secret-key"
+   
+   # オプション：認証方法を選択
+   # オプション1：ユーザー名/パスワード（WebUI/対話型使用向け）
    export ADMIN_USERNAME="admin"
    export ADMIN_PASSWORD_HASH="$(python scripts/generate_password_hash.py)"
+   
+   # オプション2：APIキー（自動化スクリプト/サービス向け）
    export API_KEYS="key1:service1:1000,key2:service2:5000"
    ```
 

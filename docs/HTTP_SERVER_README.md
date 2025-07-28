@@ -1,15 +1,18 @@
 # PDF RAG HTTP Server Documentation
 
-This document provides comprehensive documentation for the PDF RAG HTTP Server, including API endpoints, authentication, deployment, and usage examples.
+This document provides comprehensive documentation for the PDF RAG HTTP Server,
+including API endpoints, authentication, deployment, and usage examples.
 
-**Important**: This HTTP server is NOT for MCP clients like Claude Desktop or Cursor. MCP clients use stdio transport, not HTTP. Use this server for:
+**Important**: This HTTP server is NOT for MCP clients like Claude Desktop or
+Cursor. MCP clients use stdio transport, not HTTP. Use this server for:
 
 - Web applications
 - Team collaboration
 - Remote API access
 - Service-to-service communication
 
-For MCP client integration, see the main README.md and use `src.mcp.simple_server` instead.
+For MCP client integration, see the main README.md and use
+`src.mcp.simple_server` instead.
 
 ## Table of Contents
 
@@ -25,7 +28,8 @@ For MCP client integration, see the main README.md and use `src.mcp.simple_serve
 
 ## Overview
 
-The PDF RAG HTTP Server provides a RESTful API interface for the PDF RAG system, enabling:
+The PDF RAG HTTP Server provides a RESTful API interface for the PDF RAG
+system, enabling:
 
 - Multi-user access with authentication
 - Remote access to RAG functionality
@@ -105,16 +109,48 @@ curl http://localhost:8000/api/documents \
 
 You must set up authentication credentials via environment variables:
 
+#### Required Settings
+
 ```bash
-# Generate admin password hash
+# REQUIRED: JWT secret key for token signing
+export JWT_SECRET_KEY="your-secret-key-here"
+```
+
+#### Optional Authentication Methods
+
+Choose one or both authentication methods based on your needs:
+
+##### Option 1: Username/Password Authentication
+
+Best for: Web applications, admin dashboards, interactive use
+
+```bash
+# Set admin username
+export ADMIN_USERNAME="admin"
+
+# Generate password hash (you'll be prompted for password)
 python scripts/generate_password_hash.py
 
-# Set required environment variables
-export JWT_SECRET_KEY="your-secret-key-here"
-export ADMIN_USERNAME="admin"
-export ADMIN_PASSWORD_HASH="$2b$12$..."  # From generate_password_hash.py
+# Export the generated hash
+export ADMIN_PASSWORD_HASH="$2b$12$..."  # Copy from script output
+```
+
+##### Option 2: API Key Authentication
+
+Best for: Automated scripts, CI/CD pipelines, service-to-service communication
+
+```bash
+# Set API keys (format: key:name:rate_limit)
 export API_KEYS="key1:service1:1000,key2:service2:5000"
 ```
+
+**Note**:
+
+- Without any authentication method configured, all API endpoints (except
+  /api/health) will return 401 Unauthorized
+- You can enable both methods simultaneously for maximum flexibility
+- The server checks JWT authentication first, then falls back to API key
+  authentication
 
 ## API Endpoints
 
@@ -549,7 +585,9 @@ server {
 
 ### Security Headers (Planned)
 
-**Note**: Security headers are configured in `config/http_server_config.yaml` but not yet automatically applied by the server. For production deployments, configure these headers in your reverse proxy (nginx/Apache) or load balancer:
+**Note**: Security headers are configured in `config/http_server_config.yaml`
+but not yet automatically applied by the server. For production deployments,
+configure these headers in your reverse proxy (nginx/Apache) or load balancer:
 
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
@@ -687,7 +725,8 @@ curl -f http://localhost:8000/api/health || exit 1
 
 ### Prometheus Metrics (Planned)
 
-**Note**: Prometheus metrics endpoint is planned but not yet implemented. This feature is on the roadmap for production monitoring capabilities.
+**Note**: Prometheus metrics endpoint is planned but not yet implemented.
+This feature is on the roadmap for production monitoring capabilities.
 
 ### Logging
 

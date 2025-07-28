@@ -69,24 +69,44 @@ Use the same installation steps from Option A.
 
 #### 2. Configure HTTP Server (2 minutes)
 
+##### Required Settings
+
 ```bash
-# Generate secure credentials
+# REQUIRED: Set LLM API key (choose one)
+export ANTHROPIC_API_KEY="your-anthropic-key"  # For Claude
+# OR
+export OPENAI_API_KEY="your-openai-key"  # For GPT-4
+
+# REQUIRED: Set JWT secret for authentication
 export JWT_SECRET_KEY="$(openssl rand -base64 32)"
+```
+
+##### Optional Authentication Settings
+
+You can choose one or both authentication methods:
+
+##### Option 1: Username/Password Authentication (Optional)
+
+```bash
+# Set admin username (optional, for web UI login)
 export ADMIN_USERNAME="admin"
 
 # Generate password hash (you'll be prompted for password)
 python scripts/generate_password_hash.py
 # Copy the generated hash and export it:
 export ADMIN_PASSWORD_HASH="$2b$12$..."
-
-# Set API keys (format: key:name:rate_limit)
-export API_KEYS="prod-key-1:production:5000,dev-key-1:development:1000"
-
-# Set LLM API key (choose one)
-export ANTHROPIC_API_KEY="your-anthropic-key"  # For Claude
-# OR
-export OPENAI_API_KEY="your-openai-key"  # For GPT-4
 ```
+
+##### Option 2: API Key Authentication (Optional)
+
+```bash
+# Set API keys for service-to-service auth (format: key:name:rate_limit)
+export API_KEYS="prod-key-1:production:5000,dev-key-1:development:1000"
+```
+
+**Note**: If you don't set any authentication credentials, all API endpoints
+will return 401 Unauthorized. Choose the authentication method(s) that best fit
+your use case.
 
 #### 3. Start Server (1 minute)
 
@@ -275,7 +295,8 @@ For detailed setup instructions, see:
    For HTTP-based access, use the HTTP API server (see HTTP API Server section below).
 
    **Troubleshooting MCP Configuration**:
-   - If you get "ModuleNotFoundError", use the direct file path in args instead of `-m`
+   - If you get "ModuleNotFoundError", use the direct file path in args
+     instead of `-m`
    - Ensure the Python path points to your virtual environment's Python
    - The `cwd` parameter is optional but can help with module resolution
 
@@ -331,7 +352,8 @@ export MCP_LOG_BACKUP_COUNT="5"
 - **Anthropic**:
   - Claude 3 series: claude-3-opus-20240229, claude-3-sonnet-20240229,
     claude-3-haiku-20240307, claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022
-  - Claude 4 series: claude-4-opus, claude-4-sonnet, claude-4-haiku (when available)
+  - Claude 4 series: claude-4-opus, claude-4-sonnet, claude-4-haiku
+    (when available)
 - **OpenAI**: gpt-4, gpt-4-turbo, gpt-3.5-turbo, gpt-4o
 - **Ollama**: llama2, llama3, mistral, codellama, o3 (or any locally installed model)
 
@@ -345,7 +367,8 @@ operations like listing documents or adding PDFs will work even without API keys
 
 This project includes two different server types:
 
-1. **MCP Server** (`src.mcp.simple_server`) - For AI assistants like Claude Desktop, Cursor
+1. **MCP Server** (`src.mcp.simple_server`) - For AI assistants like Claude
+   Desktop, Cursor
    - Uses stdio (standard input/output) transport
    - Direct integration with AI tools
    - No authentication needed (handled by the client)
@@ -375,9 +398,15 @@ and remote access:
 1. **Set environment variables**:
 
    ```bash
+   # REQUIRED: JWT secret for token signing
    export JWT_SECRET_KEY="your-secure-secret-key"
+   
+   # OPTIONAL: Choose your authentication method(s)
+   # Option 1: Username/Password (for web UI/interactive use)
    export ADMIN_USERNAME="admin"
    export ADMIN_PASSWORD_HASH="$(python scripts/generate_password_hash.py)"
+   
+   # Option 2: API Keys (for automated scripts/services)
    export API_KEYS="key1:service1:1000,key2:service2:5000"
    ```
 
