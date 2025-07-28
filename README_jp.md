@@ -114,24 +114,37 @@ export API_KEYS="prod-key-1:production:5000,dev-key-1:development:1000"
 # HTTPサーバーを起動
 python -m src.mcp.http_server
 
-# サーバーはhttp://localhost:8000で実行中
-# APIドキュメントはhttp://localhost:8000/docsで利用可能
+# サーバーはhttp://localhost:8080で実行中
+# REST APIドキュメントはhttp://localhost:8080/docsで利用可能
+# MCPエンドポイントはhttp://localhost:8080/mcpで利用可能
 ```
 
-#### 4. クイックテスト
+#### 4. HTTP MCP用Claude Desktopの設定（オプション）
+
+HTTPサーバーでClaude Desktopを使用したい場合：
+
+```json
+{
+  "mcpServers": {
+    "pdf-rag": {
+      "url": "http://localhost:8080/mcp"
+    }
+  }
+}
+```
+
+#### 5. クイックテスト
 
 ```bash
-# curlでテスト
-curl -X POST http://localhost:8000/api/auth/login \
+# REST APIをcurlでテスト
+curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}'
 
-# またはPythonクライアントを使用
-python -c "
-from src.mcp.http_client import PDFRAGClient
-client = PDFRAGClient(username='admin', password='your-password')
-print(client.health_check())
-"
+# またはMCPエンドポイントをテスト
+curl -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
 これで、HTTP APIサーバーがチーム使用の準備完了です！

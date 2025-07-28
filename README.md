@@ -24,7 +24,11 @@ That's it! The install script handles everything including uv installation.
 
 #### 2. Configure MCP Server (1 minute)
 
-Add to your Claude Desktop config file:
+Choose your connection method:
+
+##### Option 2A: Local MCP Server (stdio transport)
+
+For single-user local access, add to your Claude Desktop config file:
 `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
@@ -45,8 +49,34 @@ Add to your Claude Desktop config file:
 }
 ```
 
-**Note**: Only `ANTHROPIC_API_KEY` is required. The server uses sensible defaults
-for other settings. For OpenAI, use `OPENAI_API_KEY` and set `LLM_TYPE` to "openai".
+**Note**: Only the API key is required (`ANTHROPIC_API_KEY` for Claude, `OPENAI_API_KEY` for GPT-4).
+
+##### Option 2B: HTTP MCP Server (HTTP transport)
+
+For remote access or if you're already running the HTTP server:
+
+1. Start the HTTP server (if not already running):
+   ```bash
+   export ANTHROPIC_API_KEY="your-api-key"  # or OPENAI_API_KEY
+   export JWT_SECRET_KEY="any-secret-key"   # Required for HTTP server
+   python -m src.mcp.http_server
+   ```
+
+2. Add to your Claude Desktop config file:
+   ```json
+   {
+     "mcpServers": {
+       "pdf-rag": {
+         "url": "http://localhost:8080/mcp"
+       }
+     }
+   }
+   ```
+
+**Benefits of HTTP transport**:
+- Share the same server across multiple Claude Desktop instances
+- Access from remote machines
+- Use alongside the REST API for web applications
 
 #### 3. Start Using (1 minute)
 
@@ -61,7 +91,7 @@ That's it! You're ready to query your PDF documents with AI.
 
 ### Option B: HTTP API Server for Team Access
 
-For teams who want a shared API server:
+For teams who want a shared API server (supports both REST API and MCP protocol):
 
 #### 1. Install (same as above)
 
@@ -119,24 +149,37 @@ HTTP server itself.
 # Start the HTTP server
 python -m src.mcp.http_server
 
-# Server is now running at http://localhost:8000
-# API docs available at http://localhost:8000/docs
+# Server is now running at http://localhost:8080
+# REST API docs available at http://localhost:8080/docs
+# MCP endpoint available at http://localhost:8080/mcp
 ```
 
-#### 4. Quick Test
+#### 4. Configure Claude Desktop for HTTP MCP (Optional)
+
+If you want to use Claude Desktop with the HTTP server:
+
+```json
+{
+  "mcpServers": {
+    "pdf-rag": {
+      "url": "http://localhost:8080/mcp"
+    }
+  }
+}
+```
+
+#### 5. Quick Test
 
 ```bash
-# Test with curl
-curl -X POST http://localhost:8000/api/auth/login \
+# Test REST API with curl
+curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}'
 
-# Or use the Python client
-python -c "
-from src.mcp.http_client import PDFRAGClient
-client = PDFRAGClient(username='admin', password='your-password')
-print(client.health_check())
-"
+# Or test MCP endpoint
+curl -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
 That's it! Your HTTP API server is ready for team use.
