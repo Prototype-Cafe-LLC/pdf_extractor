@@ -3,16 +3,15 @@
 This document provides comprehensive documentation for the PDF RAG HTTP Server,
 including API endpoints, authentication, deployment, and usage examples.
 
-**Important**: This HTTP server is NOT for MCP clients like Claude Desktop or
-Cursor. MCP clients use stdio transport, not HTTP. Use this server for:
+**Important**: This HTTP server now supports both REST API and MCP protocol:
 
-- Web applications
-- Team collaboration
-- Remote API access
-- Service-to-service communication
+- **REST API** (`/api/*` endpoints): For web applications, team collaboration,
+  and service-to-service communication
+- **MCP Protocol** (`/mcp` endpoint): For MCP clients like Claude Desktop
+  using HTTP transport
 
-For MCP client integration, see the main README.md and use
-`src.mcp.simple_server` instead.
+For local MCP client integration using stdio transport, see the main README.md
+and use `src.mcp.simple_server` instead.
 
 ## Table of Contents
 
@@ -160,6 +159,55 @@ export API_KEYS="key1:service1:1000,key2:service2:5000"
   authentication
 
 ## API Endpoints
+
+### MCP Protocol Endpoints
+
+The server now includes MCP (Model Context Protocol) support for AI clients:
+
+#### POST /mcp
+
+Handle MCP JSON-RPC requests.
+
+**No authentication required** - MCP clients handle their own authentication.
+
+**Request:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/list",
+  "params": {}
+}
+```
+
+**Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "pdfrag.query_technical_docs",
+        "description": "Query the PDF RAG knowledge base for technical documentation answers",
+        "inputSchema": {...}
+      }
+    ]
+  }
+}
+```
+
+#### GET /mcp
+
+Server-Sent Events (SSE) endpoint for MCP streaming connections.
+
+**Headers:**
+
+- `X-Session-ID`: Optional session identifier
+
+**Response:** Event stream with heartbeat messages
 
 ### Authentication Endpoints
 

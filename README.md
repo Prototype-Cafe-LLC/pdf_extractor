@@ -296,8 +296,42 @@ For detailed setup instructions, see:
    }
    ```
 
-   **Note**: The current MCP servers use stdio (standard input/output) transport.
-   For HTTP-based access, use the HTTP API server (see HTTP API Server section below).
+   **Note**: The example above uses stdio (standard input/output) transport.
+   Our HTTP server now also supports MCP protocol on the `/mcp` endpoint.
+
+   **HTTP Transport Example:**
+
+   You can now use HTTP transport to connect to this PDF RAG server:
+
+   ```json
+   {
+     "mcpServers": {
+       "pdf-rag": {
+         "url": "http://localhost:8080/mcp"
+       }
+     }
+   }
+   ```
+
+   **HTTP+SSE Transport Example (Legacy):**
+
+   ```json
+   {
+     "mcpServers": {
+       "sse-server": {
+         "transport": "sse",
+         "url": "https://api.example.com/sse",
+         "headers": {
+           "X-API-Key": "your-api-key"
+         }
+       }
+     }
+   }
+   ```
+
+   **Important**: The PDF RAG MCP server (`simple_server.py`) currently only
+   supports stdio transport. For HTTP-based access to PDF RAG functionality,
+   use the separate HTTP API server (see HTTP API Server section below).
 
    **Troubleshooting MCP Configuration**:
    - If you get "ModuleNotFoundError", use the direct file path in args

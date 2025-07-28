@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 import uvicorn
 import yaml
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
@@ -25,6 +25,7 @@ try:
     from ..rag_engine.retrieval import RAGEngine
     from .auth import get_current_user, User, auth_router
     from .logging_config import configure_mcp_logging, log_system_info
+    from .mcp_http_adapter import MCPHTTPAdapter
 except ImportError:
     # Fall back to absolute import (when run directly)
     import sys
@@ -33,6 +34,7 @@ except ImportError:
     from src.rag_engine.retrieval import RAGEngine
     from src.mcp.auth import get_current_user, User, auth_router
     from src.mcp.logging_config import configure_mcp_logging, log_system_info
+    from src.mcp.mcp_http_adapter import MCPHTTPAdapter
 
 # Configure logger with rotation
 logger = configure_mcp_logging(server_type="http", enable_console=True)
@@ -111,6 +113,7 @@ class PDFRAGHTTPServer:
         # Get project root directory (two levels up from src/mcp/)
         self._project_root = Path(__file__).parent.parent.parent
         self.rag_engine = None
+        self.mcp_adapter = None
         self.config = self._load_config()
         
         # SECURITY: Define allowed base directories for file operations
@@ -230,10 +233,15 @@ class PDFRAGHTTPServer:
 
             self.rag_engine = RAGEngine(rag_config)
             logger.info("RAG engine initialized successfully")
+            
+            # Initialize MCP adapter
+            self.mcp_adapter = MCPHTTPAdapter(self.rag_engine)
+            logger.info("MCP HTTP adapter initialized successfully")
 
         except Exception as e:
             logger.error(f"Failed to initialize RAG engine: {e}")
             self.rag_engine = None
+            self.mcp_adapter = None
             raise
 
 
@@ -287,6 +295,31 @@ async def health_check():
         version="1.0.0",
         components=components
     )
+
+
+# MCP Protocol Endpoints
+@app.post("/mcp")
+async def mcp_endpoint(request: Request):
+    """Handle MCP JSON-RPC requests."""
+    if not server.mcp_adapter:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="MCP adapter not available"
+        )
+    
+    return await server.mcp_adapter.handle_mcp_request(request)
+
+
+@app.get("/mcp")
+async def mcp_sse_endpoint(request: Request):
+    """Handle MCP Server-Sent Events (SSE) connections."""
+    if not server.mcp_adapter:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="MCP adapter not available"
+        )
+    
+    return await server.mcp_adapter.handle_sse_request(request)
 
 
 @app.post("/api/query", response_model=QueryResponse)

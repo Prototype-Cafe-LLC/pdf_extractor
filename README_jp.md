@@ -291,8 +291,47 @@ PDF ExtractorにはMCP（Model Context Protocol）サーバー統合による高
    }
    ```
 
-   **注意**：現在のMCPサーバーはstdio（標準入出力）トランスポートを使用します。
-   HTTPベースのアクセスには、HTTP APIサーバーを使用してください（下記のHTTP APIサーバーセクションを参照）。
+   **注意**：上記の例はstdio（標準入出力）トランスポートを使用しています。
+   MCPはリモートサーバー用のHTTPトランスポートもサポートしています。以下の例を参照してください。
+
+   **HTTPトランスポートの例（リモートMCPサーバー用）：**
+
+   HTTPトランスポートをサポートするMCPサーバー（このPDF RAGサーバーではなく、
+   他のMCPサーバー）の場合、次のように設定できます：
+
+   ```json
+   {
+     "mcpServers": {
+       "remote-server": {
+         "transport": "http",
+         "url": "https://api.example.com/mcp",
+         "headers": {
+           "Authorization": "Bearer your-api-token"
+         }
+       }
+     }
+   }
+   ```
+
+   **HTTP+SSEトランスポートの例（レガシー）：**
+
+   ```json
+   {
+     "mcpServers": {
+       "sse-server": {
+         "transport": "sse",
+         "url": "https://api.example.com/sse",
+         "headers": {
+           "X-API-Key": "your-api-key"
+         }
+       }
+     }
+   }
+   ```
+
+   **重要**：PDF RAG MCPサーバー（`simple_server.py`）は現在stdioトランスポート
+   のみをサポートしています。PDF RAG機能へのHTTPベースのアクセスには、
+   別のHTTP APIサーバーを使用してください（下記のHTTP APIサーバーセクションを参照）。
 
    **MCP設定のトラブルシューティング**：
    - "ModuleNotFoundError"が発生した場合、`-m`の代わりにargsで直接ファイルパスを使用
