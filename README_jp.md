@@ -8,7 +8,7 @@ PDFからコンテンツを抽出します。
 
 お好みのセットアップを選択してください：
 
-### オプションA：Claude Desktop用MCPサーバー
+### オプションA：ローカルMCPサーバー
 
 MCPサーバーを素早く稼働させたい忙しいユーザー向け：
 
@@ -59,7 +59,7 @@ Claude Desktopを再起動してチャットを開始：
 
 これで、AIでPDFドキュメントにクエリする準備ができました！
 
-### オプションB：チームアクセス用HTTP APIサーバー
+### オプションB：チームアクセス用HTTP API MCPサーバー
 
 共有APIサーバーが必要なチーム向け：
 
@@ -119,9 +119,9 @@ python -m src.mcp.http_server
 # MCPエンドポイントはhttp://localhost:8080/mcpで利用可能
 ```
 
-#### 4. HTTP MCP用Claude Desktopの設定（オプション）
+#### 4. MCPクライアントの設定（オプション）
 
-HTTPサーバーでClaude Desktopを使用したい場合：
+ネットワーク上のMCPサーバーを使用したい場合：
 
 ```json
 {

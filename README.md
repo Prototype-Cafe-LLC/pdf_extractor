@@ -8,7 +8,7 @@ and structure.
 
 Choose your preferred setup:
 
-### Option A: MCP Server for Claude Desktop
+### Option A: Local MCP Server
 
 For busy users who want to get the MCP server running quickly:
 
@@ -24,11 +24,7 @@ That's it! The install script handles everything including uv installation.
 
 #### 2. Configure MCP Server (1 minute)
 
-Choose your connection method:
-
-##### Option 2A: Local MCP Server (stdio transport)
-
-For single-user local access, add to your Claude Desktop config file:
+Add to your Claude Desktop config file:
 `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
@@ -49,34 +45,9 @@ For single-user local access, add to your Claude Desktop config file:
 }
 ```
 
-**Note**: Only the API key is required (`ANTHROPIC_API_KEY` for Claude, `OPENAI_API_KEY` for GPT-4).
-
-##### Option 2B: HTTP MCP Server (HTTP transport)
-
-For remote access or if you're already running the HTTP server:
-
-1. Start the HTTP server (if not already running):
-   ```bash
-   export ANTHROPIC_API_KEY="your-api-key"  # or OPENAI_API_KEY
-   export JWT_SECRET_KEY="any-secret-key"   # Required for HTTP server
-   python -m src.mcp.http_server
-   ```
-
-2. Add to your Claude Desktop config file:
-   ```json
-   {
-     "mcpServers": {
-       "pdf-rag": {
-         "url": "http://localhost:8080/mcp"
-       }
-     }
-   }
-   ```
-
-**Benefits of HTTP transport**:
-- Share the same server across multiple Claude Desktop instances
-- Access from remote machines
-- Use alongside the REST API for web applications
+**Note**: Only `ANTHROPIC_API_KEY` is required. The server uses sensible
+defaults for other settings. For OpenAI, use `OPENAI_API_KEY` and set
+`LLM_TYPE` to "openai".
 
 #### 3. Start Using (1 minute)
 
@@ -91,7 +62,7 @@ That's it! You're ready to query your PDF documents with AI.
 
 ### Option B: HTTP API Server for Team Access
 
-For teams who want a shared API server (supports both REST API and MCP protocol):
+For teams who want a shared API server:
 
 #### 1. Install (same as above)
 
@@ -140,8 +111,7 @@ your use case.
 
 **Important for MCP Server users**: When using the HTTP server as an MCP server,
 you don't need to include authentication credentials in the MCP server configuration.
-However, you must still configure one of the authentication methods above for the
-HTTP server itself.
+However, you must still configure one of the authentication methods above.
 
 #### 3. Start Server (1 minute)
 
@@ -154,9 +124,9 @@ python -m src.mcp.http_server
 # MCP endpoint available at http://localhost:8080/mcp
 ```
 
-#### 4. Configure Claude Desktop for HTTP MCP (Optional)
+#### 4. Configure MCP Client (Optional)
 
-If you want to use Claude Desktop with the HTTP server:
+If you want to use an MCP server over the network:
 
 ```json
 {
@@ -340,17 +310,22 @@ For detailed setup instructions, see:
    ```
 
    **Note**: The example above uses stdio (standard input/output) transport.
-   Our HTTP server now also supports MCP protocol on the `/mcp` endpoint.
+   MCP also supports HTTP transport for remote servers. See examples below.
 
-   **HTTP Transport Example:**
+   **HTTP Transport Example (for remote MCP servers):**
 
-   You can now use HTTP transport to connect to this PDF RAG server:
+   For MCP servers that support HTTP transport (not this PDF RAG server, but
+   other MCP servers), you can configure them like this:
 
    ```json
    {
      "mcpServers": {
-       "pdf-rag": {
-         "url": "http://localhost:8080/mcp"
+       "remote-server": {
+         "transport": "http",
+         "url": "https://api.example.com/mcp",
+         "headers": {
+           "Authorization": "Bearer your-api-token"
+         }
        }
      }
    }
