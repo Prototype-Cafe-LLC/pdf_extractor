@@ -108,6 +108,11 @@ export API_KEYS="prod-key-1:production:5000,dev-key-1:development:1000"
 will return 401 Unauthorized. Choose the authentication method(s) that best fit
 your use case.
 
+**Important for MCP Server users**: When using the HTTP server as an MCP server,
+you don't need to include authentication credentials in the MCP server configuration.
+However, you must still configure one of the authentication methods above for the
+HTTP server itself.
+
 #### 3. Start Server (1 minute)
 
 ```bash

@@ -40,12 +40,20 @@ auth:
   # - ADMIN_USERNAME: Admin username
   # - ADMIN_PASSWORD_HASH: Bcrypt hash of admin password
   # - API_KEYS: Comma-separated list of key:name:limit
+  #   Format: "api_key:service_name:rate_limit_per_hour"
+  #   - api_key: The actual API key string (e.g., "sk-1234567890abcdef")
+  #   - service_name: Descriptive name for the service using this key (e.g., "web-app", "mobile-app", "analytics-service")
+  #   - rate_limit_per_hour: Number of requests allowed per hour for this key (e.g., 1000, 5000, 10000)
   #
   # Example:
   # export JWT_SECRET_KEY="your-secret-key-here"
   # export ADMIN_USERNAME="admin"
   # export ADMIN_PASSWORD_HASH="$2b$12$..."  # Use bcrypt to generate
   # export API_KEYS="key1:service1:1000,key2:service2:5000"
+  #
+  # Complete examples:
+  # export API_KEYS="sk-prod-abc123:production-web:10000,sk-dev-xyz789:development:1000,sk-test-qrs456:testing:500"
+  # export API_KEYS="my-secure-key-1:mobile-app:5000,my-secure-key-2:analytics-service:2000"
 
 # TLS/SSL Configuration (for production)
 tls:

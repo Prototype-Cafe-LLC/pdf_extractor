@@ -140,8 +140,15 @@ export ADMIN_PASSWORD_HASH="$2b$12$..."  # Copy from script output
 Best for: Automated scripts, CI/CD pipelines, service-to-service communication
 
 ```bash
-# Set API keys (format: key:name:rate_limit)
+# Set API keys (format: api_key:service_name:rate_limit_per_hour)
+# - api_key: The actual API key string
+# - service_name: Descriptive name for the service
+# - rate_limit_per_hour: Number of requests allowed per hour
 export API_KEYS="key1:service1:1000,key2:service2:5000"
+
+# Real-world examples:
+# export API_KEYS="sk-prod-abc123:production-web:10000,sk-dev-xyz789:development:1000"
+# export API_KEYS="secure-key-mobile:mobile-app:5000,secure-key-analytics:analytics-service:2000"
 ```
 
 **Note**:
@@ -600,6 +607,51 @@ configure these headers in your reverse proxy (nginx/Apache) or load balancer:
 2. **Store keys securely**: Never commit keys to version control
 3. **Rotate keys regularly**: Implement key rotation policy
 4. **Monitor key usage**: Track and audit API key usage
+
+#### API Key Format Details
+
+When setting the `API_KEYS` environment variable, use the following format:
+
+```bash
+# Format: api_key:service_name:rate_limit_per_hour
+export API_KEYS="key1:name1:limit1,key2:name2:limit2,..."
+```
+
+**Components:**
+
+- **api_key**: The actual API key string (e.g., "sk-1234567890abcdef")
+  - Should be at least 32 characters long for security
+  - Use only alphanumeric characters and hyphens
+  - Generate using secure random methods
+
+- **service_name**: Descriptive identifier for the service
+  (e.g., "web-app", "mobile-ios", "analytics")
+  - Used for logging and monitoring
+  - Should be unique per API key
+  - Helps identify which service is making requests
+
+- **rate_limit_per_hour**: Maximum requests allowed per hour
+  (e.g., 1000, 5000, 10000)
+  - Enforced per API key
+  - Prevents abuse and ensures fair usage
+  - Set based on expected service load
+
+**Example configurations:**
+
+```bash
+# Development environment
+export API_KEYS="dev-key-123:local-testing:1000"
+
+# Production with multiple services (split for readability)
+export API_KEYS="sk-prod-web-abc123:production-website:10000,\
+sk-prod-mobile-xyz789:mobile-app:5000,\
+sk-prod-analytics-qrs456:analytics-service:2000"
+
+# Mixed environment
+export API_KEYS="prod-key-1:web-frontend:10000,\
+staging-key-1:staging-api:5000,\
+test-key-1:integration-tests:1000"
+```
 
 ## Troubleshooting
 

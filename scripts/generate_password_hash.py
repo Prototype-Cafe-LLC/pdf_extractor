@@ -46,7 +46,8 @@ def main():
     print("Make sure to also set:")
     print("- JWT_SECRET_KEY: A secure random string")
     print("- ADMIN_USERNAME: Your admin username")
-    print("- API_KEYS: Your API keys (format: key:name:limit)")
+    print("- API_KEYS: Your API keys (format: api_key:service_name:rate_limit_per_hour)")
+    print("  Example: sk-prod-123:production-web:10000,sk-dev-456:development:1000")
 
 
 if __name__ == "__main__":
